@@ -65,17 +65,5 @@ python data_inspection_scripts/inspect_tcga_titan_features.py \
     --output_path custom_tsne_plot.png
 ```
 
-## Dependencies
-Ensure you have the following Python packages installed:
-```sh
-pip install pandas numpy scikit-learn matplotlib
-```
-
-## Notes
-- The embedding `.pkl` file should contain at least `filenames` and `embeddings` keys.
-- The clinical reports `.csv` file should have a column named `patient_filename`.
-- The scripts assume filenames follow a `TCGA-XX-YYYY` format for extracting patient IDs.
-
-These scripts are useful for validating data consistency and visualizing embedding distributions in TCGA datasets.
 
 
