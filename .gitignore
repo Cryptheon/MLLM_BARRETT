@@ -173,6 +173,7 @@ cython_debug/
 #ML
 data/tcga_titan_features/
 data/TCGA_reports/
+data/tcga_data/
 
 # PyPI configuration file
 .pypirc
