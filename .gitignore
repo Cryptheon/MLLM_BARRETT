@@ -170,5 +170,9 @@ cython_debug/
 # Ruff stuff:
 .ruff_cache/
 
+#ML
+data/tcga_titan_features/
+data/TCGA_reports/
+
 # PyPI configuration file
 .pypirc
