@@ -35,7 +35,7 @@ def compute_statistics(data: dict):
     print(f"- Global Mean: {mean_value}")
     print(f"- Global Std Dev: {std_dev_value}")
 
-def visualize_tsne(data: dict, sample_size=500, output_path="tsne_visualization.png"):
+def visualize_tsne(data: dict, sample_size=2000, output_path="tsne_visualization.png"):
     """Visualizes a subset of embeddings using t-SNE and saves the plot."""
     embeddings = data['embeddings']
     sample_indices = np.random.choice(len(embeddings), min(sample_size, len(embeddings)), replace=False)

@@ -15,7 +15,12 @@ def load_reports(csv_path: str) -> pd.DataFrame:
 
 def extract_patient_id(filename: str) -> str:
     """Extracts the patient ID from a TCGA filename."""
-    return filename.split('.')[0]  # Keep only TCGA-XX-YYYY
+    return filename.split('.')[0]  # Keep only 'TCGA-XX-YYYY'
+
+def extract_patient_id_from_embedding(filename: str) -> str:
+    """Extracts the patient ID from an embedding filename that contains additional fields."""
+    splitted = filename.split("-")
+    return splitted[0] + '-' + splitted[1] + '-' + splitted[2]  # 'TCGA-XX-YYYY'
 
 def check_multiple_embeddings(embeddings_file: str, reports_file: str):
     """Checks if multiple embeddings exist for a single patient-level clinical report."""
@@ -31,7 +36,7 @@ def check_multiple_embeddings(embeddings_file: str, reports_file: str):
     # Extract patient IDs from both sources
     embeddings_by_patient = defaultdict(list)
     for filename in embedding_filenames:
-        patient_id = extract_patient_id(filename)
+        patient_id = extract_patient_id_from_embedding(filename)
         embeddings_by_patient[patient_id].append(filename)
 
     report_patients = {extract_patient_id(f) for f in report_filenames}
@@ -52,8 +57,8 @@ def check_multiple_embeddings(embeddings_file: str, reports_file: str):
 
 def main():
     parser = argparse.ArgumentParser(description="Check for multiple embeddings per clinical report in TCGA dataset.")
-    parser.add_argument("--embeddings_file_path", type=str, help="Path to the embeddings .pkl file")
-    parser.add_argument("--reports_file_path", type=str, help="Path to the clinical reports .csv file")
+    parser.add_argument("--embeddings_file_path", type=str, required=True, help="Path to the embeddings .pkl file")
+    parser.add_argument("--reports_file_path", type=str, required=True, help="Path to the clinical reports .csv file")
 
     args = parser.parse_args()
 
