@@ -44,7 +44,8 @@ class PathoLlamaForCausalLM(LlamaForCausalLM):
 
         for i in range(batch_size):
             text_ids = input_ids[i]
-            txt_embeds = model.embed_tokens(text_ids)
+            # chop the EOS token off for Causal LM
+            txt_embeds = model.embed_tokens(text_ids[:-1])
             wsi_embeds = wsi_embeddings[i]
             
             # new_embeds looks like: [wsi_embeds, bos, txt_embeds, eos]
@@ -56,11 +57,10 @@ class PathoLlamaForCausalLM(LlamaForCausalLM):
             text_labels = text_ids.clone() if labels is None else labels[i]
             labels_i = torch.cat([
                 torch.full((num_wsi,), IGNORE_INDEX, device=device, dtype=text_labels.dtype),
-                text_labels[:-1],  # Shift labels left for causal LM
-                torch.full((1,), IGNORE_INDEX, device=device, dtype=text_labels.dtype)
+                text_labels[1:],  # Shift labels for causal LM
             ], dim=0)
             new_labels_list.append(labels_i)
-
+        
         # Apply truncation if necessary
         if tokenizer_model_max_length is not None:
             new_input_embeds_list = [x[:tokenizer_model_max_length] for x in new_input_embeds_list]
@@ -96,7 +96,6 @@ class PathoLlamaForCausalLM(LlamaForCausalLM):
     def forward(self, input_ids=None, attention_mask=None, position_ids=None, past_key_values=None,
                 inputs_embeds=None, labels=None, use_cache=None, output_attentions=None,
                 output_hidden_states=None, wsi_embeddings=None, return_dict=None, cache_position=None, **kwargs):
-
         # Generation step (after first token) — skip multimodal prep
         if past_key_values is not None:
             if inputs_embeds is None:
@@ -120,7 +119,7 @@ class PathoLlamaForCausalLM(LlamaForCausalLM):
                     tokenizer_model_max_length=getattr(self.config, "tokenizer_model_max_length", None),
                     padding_side="right"
                 )
-                
+
         return super().forward(
             input_ids=input_ids, attention_mask=attention_mask, position_ids=position_ids,
             past_key_values=past_key_values, inputs_embeds=inputs_embeds, labels=labels,
