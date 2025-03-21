@@ -1,0 +1,27 @@
+model:
+  vocab_size: 32000
+  hidden_size: 768
+  num_hidden_layers: 4
+  num_attention_heads: 4
+  max_position_embeddings: 2048
+  pad_token_id: 0
+  bos_token_id: 1
+  eos_token_id: 2
+
+dataset:
+  length: 128
+  seq_len: 32
+
+training:
+  output_dir: "./pathollama_train"
+  evaluation_strategy: "steps"
+  save_strategy: "steps"
+  save_steps: 20
+  logging_steps: 10
+  per_device_train_batch_size: 2
+  num_train_epochs: 1
+  learning_rate: 5e-5
+  fp16: true
+  remove_unused_columns: false
+  report_to: ["tensorboard"]
+
