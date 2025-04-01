@@ -1,3 +1,5 @@
+import os
+import pickle
 from typing import Dict, Any
 import torch
 from torch.utils.data import Dataset
@@ -41,6 +43,8 @@ class PathoMultiModalDataset(Dataset):
     ) -> None:
         super().__init__()
         self.tokenizer = tokenizer
+        # max length refers to max length of the whole
+        # sequence (WSI embeddings + textual embeddings)
         self.max_length = max_length
         self.hidden_size = hidden_size
 
@@ -62,7 +66,9 @@ class PathoMultiModalDataset(Dataset):
         text: str = patient["report_text"]
         embeddings = patient["embeddings"]  # List of tensors
 
-        # Truncate to max number of embeddings if needed
+        # Truncate to max number of embeddings if needed.
+        # Although, we can skip this as we're not exceeding the 
+        # max length with only WSI embeddings.
         if len(embeddings) > self.max_length:
             embeddings = embeddings[:self.max_length]
 
@@ -79,6 +85,10 @@ class PathoMultiModalDataset(Dataset):
         )
 
         input_ids = tokenized["input_ids"].squeeze(0)  # remove batch dim
+
+        # We clone the labels without shifting it for CausalLM.
+        # We explicitly construct the shifted labels for next token prediction in the model
+        # The dataset should return the cloned input ids only for flexiblity.
         labels = input_ids.clone()
 
         return {
