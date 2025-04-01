@@ -1,9 +1,8 @@
-import torch
 import yaml
 from transformers import AutoTokenizer, TrainingArguments
-from patho_llama import PathoLlamaForCausalLM, PathoLlamaConfig
-from dummy_dataset import DummyMultiModalDataset
-from multimodal_trainer import MultiModalTrainer
+from src.model.patho_llama import PathoLlamaForCausalLM, PathoLlamaConfig
+from src.data.datasets import DummyMultiModalDataset
+from src.multimodal_trainer import MultiModalTrainer
 
 def load_config(path: str) -> dict:
     with open(path, 'r') as file:
@@ -12,9 +11,10 @@ def load_config(path: str) -> dict:
 def main():
     config = load_config("config.yaml")
 
-    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-hf")
+    # Load tokenizer and model
+    tokenizer = AutoTokenizer.from_pretrained(config["model"]["core_model_name"])
     tokenizer.pad_token = "<pad>"
-    tokenizer.add_special_tokens({"bos_token": "<s>", "eos_token": "</s>"})
+    tokenizer.add_special_tokens({"bos_token": "<s>", "eos_token": "</s>"})\
 
     model_config = PathoLlamaConfig(**config["model"])
     model = PathoLlamaForCausalLM(model_config)
