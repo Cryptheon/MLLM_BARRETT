@@ -53,6 +53,8 @@ def merge_embeddings_with_reports(embeddings_file: str, reports_file: str, outpu
     # Store embeddings per patient
     for filename, embedding in zip(embedding_filenames, embedding_vectors):
         patient_id = extract_patient_id_from_embedding(filename)
+        # should have a check if the patient_id exists in the reports_df, else
+        # we can be storing embeddings for a patient for which there is no report.
         patient_data[patient_id]["embedding_filenames"].append(filename)
         patient_data[patient_id]["embeddings"].append(embedding)
 

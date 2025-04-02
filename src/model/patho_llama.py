@@ -31,8 +31,13 @@ class PathoLlamaForCausalLM(LlamaForCausalLM):
         return self.model
 
     def prepare_inputs_labels_for_multimodal(
-        self, input_ids: Tensor, position_ids: Tensor, attention_mask: Tensor, past_key_values,
-        labels: Tensor, wsi_embeddings: list, tokenizer_model_max_length: int = None,
+        self, 
+        input_ids: Tensor, 
+        position_ids: Tensor, 
+        attention_mask: Tensor, past_key_values,
+        labels: Tensor, 
+        wsi_embeddings: list, 
+        tokenizer_model_max_length: int = None,
         padding_side: str = "right"
     ):
         batch_size = input_ids.size(0)
@@ -49,7 +54,7 @@ class PathoLlamaForCausalLM(LlamaForCausalLM):
             wsi_embeds = wsi_embeddings[i]
             
             # new_embeds looks like: [wsi_embeds, bos, txt_embeds, eos]
-            # bos and eos should be already in the input_ids
+            # bos and eos should be already in the input_ids (txt_embeds here)
             new_embeds = torch.cat([wsi_embeds, txt_embeds], dim=0)
             new_input_embeds_list.append(new_embeds)
             
@@ -93,9 +98,20 @@ class PathoLlamaForCausalLM(LlamaForCausalLM):
         # position_ids ommitted for now
         return None, None, attention_mask_padded, past_key_values, new_input_embeds, new_labels_padded
 
-    def forward(self, input_ids=None, attention_mask=None, position_ids=None, past_key_values=None,
-                inputs_embeds=None, labels=None, use_cache=None, output_attentions=None,
-                output_hidden_states=None, wsi_embeddings=None, return_dict=None, cache_position=None, **kwargs):
+    def forward(self, 
+                input_ids=None, 
+                attention_mask=None, 
+                position_ids=None, 
+                past_key_values=None,
+                inputs_embeds=None, 
+                labels=None, 
+                use_cache=None, 
+                output_attentions=None,
+                output_hidden_states=None, 
+                wsi_embeddings=None, 
+                return_dict=None, 
+                cache_position=None, 
+                **kwargs):
         # Generation step (after first token) — skip multimodal prep
         if past_key_values is not None:
             if inputs_embeds is None:
@@ -121,15 +137,25 @@ class PathoLlamaForCausalLM(LlamaForCausalLM):
                 )
 
         return super().forward(
-            input_ids=input_ids, attention_mask=attention_mask, position_ids=position_ids,
-            past_key_values=past_key_values, inputs_embeds=inputs_embeds, labels=labels,
-            use_cache=use_cache, output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states, return_dict=return_dict,
-            cache_position=cache_position, **kwargs
+            input_ids=input_ids, 
+            attention_mask=attention_mask, 
+            position_ids=position_ids,
+            past_key_values=past_key_values, 
+            inputs_embeds=inputs_embeds, 
+            labels=labels,
+            use_cache=use_cache, 
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states, 
+            return_dict=return_dict,
+            cache_position=cache_position, 
+            **kwargs
         )
 
     @torch.no_grad()
-    def generate(self, inputs=None, wsi_embeddings=None, **kwargs):
+    def generate(self, 
+                 inputs=None, 
+                 wsi_embeddings=None, 
+                 **kwargs):
         position_ids = kwargs.pop("position_ids", None)
         attention_mask = kwargs.pop("attention_mask", None)
 

@@ -1,4 +1,8 @@
+import os
+import pickle
 from typing import Dict, Any
+import random
+import numpy as np
 import torch
 from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizer
@@ -36,13 +40,15 @@ class PathoMultiModalDataset(Dataset):
         self,
         pickle_file: str,
         tokenizer: PreTrainedTokenizer,
-        max_length: int = 512,
-        hidden_size: int = 768
+        max_seq_length: int = 512,
+        embeddings_dim_size: int = 768
     ) -> None:
         super().__init__()
         self.tokenizer = tokenizer
-        self.max_length = max_length
-        self.hidden_size = hidden_size
+        # max length refers to max length of the whole
+        # sequence (WSI embeddings + textual embeddings)
+        self.max_length = max_seq_length
+        self.hidden_size = embeddings_dim_size
 
         if not os.path.exists(pickle_file):
             raise FileNotFoundError(f"Pickle file not found: {pickle_file}")
@@ -60,18 +66,22 @@ class PathoMultiModalDataset(Dataset):
         patient = self.data[patient_id]
 
         text: str = patient["report_text"]
-        embeddings = patient["embeddings"]  # List of tensors
+        wsi_embeddings = torch.tensor(np.array(patient["embeddings"]))  # List of tensors
+        
+        if text is None or len(wsi_embeddings)==0 :
+            # Resample if shuffling, otherwise get next sequential
+            new_idx = random.randint(0, len(self.patient_ids) - 1) if getattr(self, "shuffle", True) else (idx + 1) % len(self)
+            return self.__getitem__(new_idx)
 
-        # Truncate to max number of embeddings if needed
-        if len(embeddings) > self.max_length:
-            embeddings = embeddings[:self.max_length]
-
-        # Stack WSI embeddings (convert list to tensor)
-        wsi_embeddings = torch.stack(embeddings)  # shape: (N_patches, hidden_size)
+        # Truncate to max number of embeddings if needed.
+        # Although, we can skip this as we're not exceeding the 
+        # max length with only WSI embeddings.
+        if len(wsi_embeddings) > self.max_length:
+            wsi_embeddings = wsi_embeddings[:self.max_length]
 
         # Tokenize text
         tokenized = self.tokenizer(
-            text,
+            text=text,
             truncation=True,
             max_length=self.max_length,
             padding="max_length",
@@ -79,6 +89,10 @@ class PathoMultiModalDataset(Dataset):
         )
 
         input_ids = tokenized["input_ids"].squeeze(0)  # remove batch dim
+
+        # We clone the labels without shifting it for CausalLM.
+        # We explicitly construct the shifted labels for next token prediction in the model
+        # The dataset should return the cloned input ids only for flexiblity.
         labels = input_ids.clone()
 
         return {
