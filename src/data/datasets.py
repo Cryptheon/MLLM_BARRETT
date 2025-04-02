@@ -1,6 +1,7 @@
 import os
 import pickle
 from typing import Dict, Any
+import random
 import numpy as np
 import torch
 from torch.utils.data import Dataset
@@ -66,6 +67,11 @@ class PathoMultiModalDataset(Dataset):
 
         text: str = patient["report_text"]
         wsi_embeddings = torch.tensor(np.array(patient["embeddings"]))  # List of tensors
+        
+        if text is None or len(wsi_embeddings)==0 :
+            # Resample if shuffling, otherwise get next sequential
+            new_idx = random.randint(0, len(self.patient_ids) - 1) if getattr(self, "shuffle", True) else (idx + 1) % len(self)
+            return self.__getitem__(new_idx)
 
         # Truncate to max number of embeddings if needed.
         # Although, we can skip this as we're not exceeding the 
@@ -75,7 +81,7 @@ class PathoMultiModalDataset(Dataset):
 
         # Tokenize text
         tokenized = self.tokenizer(
-            text,
+            text=text,
             truncation=True,
             max_length=self.max_length,
             padding="max_length",
