@@ -12,3 +12,5 @@ safetensors
 pandas
 h5py
 PyYAML
+tensorboard
+wandb

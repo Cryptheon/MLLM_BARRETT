@@ -1,29 +1,36 @@
 model:
   core_model_name: "meta-llama/Meta-Llama-3-8B"
-  vocab_size: 32000
+  vocab_size: 128256
   hidden_size: 768
-  num_hidden_layers: 4
-  num_attention_heads: 4
+  num_hidden_layers: 2
+  num_attention_heads: 2
   max_position_embeddings: 4096
-  pad_token_id: 0
-  bos_token_id: 1
-  eos_token_id: 2
 
 dataset:
   pickle_file_path: "./data/tcga_data/tcga_titan_embeddings_reports.pkl"
   embeddings_dim_size: 768
-  max_seq_len: 4096
+  max_seq_length: 256
 
 training:
   output_dir: "./pathollama_train"
-  evaluation_strategy: "steps"
+  eval_strategy: "epoch"
+  do_train: true
+  do_eval: false
   save_strategy: "steps"
   save_steps: 20
-  logging_steps: 10
-  per_device_train_batch_size: 2
+  logging_steps: 1
+  lr_scheduler_type: "linear"
+  logging_strategy: "steps"
+  #logging_dir: "./runs"
+  per_device_train_batch_size: 4
+  per_device_eval_batch_size: 1
   num_train_epochs: 1
-  learning_rate: 1e-4
+  learning_rate: 0.0001
+  dataloader_num_workers: 0
   fp16: true
+  bf16: false
   remove_unused_columns: false
+  disable_tqdm: False
   report_to: ["tensorboard"]
+
 
