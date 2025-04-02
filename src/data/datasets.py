@@ -1,6 +1,7 @@
 import os
 import pickle
 from typing import Dict, Any
+import numpy as np
 import torch
 from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizer
@@ -64,16 +65,13 @@ class PathoMultiModalDataset(Dataset):
         patient = self.data[patient_id]
 
         text: str = patient["report_text"]
-        embeddings = patient["embeddings"]  # List of tensors
+        wsi_embeddings = torch.tensor(np.array(patient["embeddings"]))  # List of tensors
 
         # Truncate to max number of embeddings if needed.
         # Although, we can skip this as we're not exceeding the 
         # max length with only WSI embeddings.
-        if len(embeddings) > self.max_length:
-            embeddings = embeddings[:self.max_length]
-
-        # Stack WSI embeddings (convert list to tensor)
-        wsi_embeddings = torch.stack(embeddings)  # shape: (N_patches, hidden_size)
+        if len(wsi_embeddings) > self.max_length:
+            wsi_embeddings = wsi_embeddings[:self.max_length]
 
         # Tokenize text
         tokenized = self.tokenizer(

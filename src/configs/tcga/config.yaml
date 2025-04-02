@@ -1,5 +1,5 @@
 model:
-  core_model_name: "meta-llama/Llama-3-7b"
+  core_model_name: "meta-llama/Meta-Llama-3-8B"
   vocab_size: 32000
   hidden_size: 768
   num_hidden_layers: 4
