@@ -1,7 +1,8 @@
+import argparse
 import yaml
 from transformers import AutoTokenizer, TrainingArguments
 from src.model.patho_llama import PathoLlamaForCausalLM, PathoLlamaConfig
-from src.data.datasets import DummyMultiModalDataset
+from src.data.datasets import PathoMultiModalDataset
 from src.multimodal_trainer import MultiModalTrainer
 
 def load_config(path: str) -> dict:
@@ -9,22 +10,23 @@ def load_config(path: str) -> dict:
         return yaml.safe_load(file)
 
 def main():
-    config = load_config("config.yaml")
+    parser = argparse.ArgumentParser(description="Train PathoLlama model with multimodal data")
+    parser.add_argument('--config', type=str, default="./configs/tcga/config.yaml", help='Path to the config YAML file')
+    args = parser.parse_args()
+
+    config = load_config(args.config)
 
     # Load tokenizer and model
     tokenizer = AutoTokenizer.from_pretrained(config["model"]["core_model_name"])
-    tokenizer.pad_token = "<pad>"
-    tokenizer.add_special_tokens({"bos_token": "<s>", "eos_token": "</s>"})\
+    tokenizer.pad_token = "<|eot_id|>"
 
     model_config = PathoLlamaConfig(**config["model"])
     model = PathoLlamaForCausalLM(model_config)
 
-    train_dataset = DummyMultiModalDataset(
-        tokenizer=tokenizer,
-        length=config["dataset"]["length"],
-        seq_len=config["dataset"]["seq_len"],
-        hidden_size=config["model"]["hidden_size"]
-    )
+    train_dataset = PathoMultiModalDataset(pickle_file=config["dataset"]["pickle_file_path"],
+                                           max_seq_length=config["dataset"]["max_seq_length"],
+                                           embeddings_hidden_size=config["dataset"]["embeddings_dim_size"],
+                                           tokenizer=tokenizer)
 
     training_args = TrainingArguments(**config["training"])
 
@@ -39,4 +41,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

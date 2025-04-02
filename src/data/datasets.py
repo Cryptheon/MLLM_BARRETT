@@ -39,15 +39,15 @@ class PathoMultiModalDataset(Dataset):
         self,
         pickle_file: str,
         tokenizer: PreTrainedTokenizer,
-        max_length: int = 512,
-        hidden_size: int = 768
+        max_seq_length: int = 512,
+        embeddings_dim_size: int = 768
     ) -> None:
         super().__init__()
         self.tokenizer = tokenizer
         # max length refers to max length of the whole
         # sequence (WSI embeddings + textual embeddings)
-        self.max_length = max_length
-        self.hidden_size = hidden_size
+        self.max_length = max_seq_length
+        self.hidden_size = embeddings_dim_size
 
         if not os.path.exists(pickle_file):
             raise FileNotFoundError(f"Pickle file not found: {pickle_file}")

@@ -4,14 +4,15 @@ model:
   hidden_size: 768
   num_hidden_layers: 4
   num_attention_heads: 4
-  max_position_embeddings: 2048
+  max_position_embeddings: 4096
   pad_token_id: 0
   bos_token_id: 1
   eos_token_id: 2
 
 dataset:
-  length: 128
-  seq_len: 32
+  pickle_file_path: "./data/tcga_data/tcga_titan_embeddings_reports.pkl"
+  embeddings_dim_size: 768
+  max_seq_len: 4096
 
 training:
   output_dir: "./pathollama_train"
