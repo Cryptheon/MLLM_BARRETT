@@ -1,0 +1,14 @@
+torch
+transformers
+accelerate
+bitsandbytes
+numpy
+matplotlib
+typing_extensions
+scipy
+scikit-learn
+scikit-image
+safetensors
+pandas
+h5py
+PyYAML
