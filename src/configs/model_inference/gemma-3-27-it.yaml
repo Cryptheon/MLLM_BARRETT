@@ -1,0 +1,9 @@
+model_name: "unsloth/gemma-3-27b-it-unsloth-bnb-4bit"
+max_seq_length: 128000
+max_new_tokens: 4096
+seed: 1111
+temperature: 1.0
+top_k: 64
+min_p: 0.00
+top_p: 0.95
+repetition_penalty: 1.0
