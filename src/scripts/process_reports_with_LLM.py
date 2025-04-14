@@ -1,12 +1,10 @@
-import re
 import torch
 import argparse
 import pandas as pd
-from pathlib import Path
 from unsloth import FastLanguageModel
 from transformers import AutoTokenizer
 import time
-from src.utils.functions import load_config
+from utils.util_functions import load_config
 
 def get_prompt(prompt_path: str) -> str:
     """Reads the prompt template from a file."""
@@ -22,10 +20,11 @@ def process_batch(model: FastLanguageModel,
                   num_variations: int) -> list:
     """Processes a batch of texts using the given language model, generating multiple variations per input."""
     
+    # format for Gemma-3 27b it
     messages = [
         [
-            {"role": "system", "content": "You are an advanced medical language model trained to process pathology-related text with accuracy and clarity."},
-            {"role": "user", "content": base_prompt.format(text)}
+            {"role": "system", "content": [{"type": "text", "text":"You are an advanced medical language model trained to process pathology-related text with accuracy and clarity."}]},
+            {"role": "user", "content": [{"type": "text", "text":base_prompt.format(text)}]}
         ]
         for text in texts
     ]
@@ -45,6 +44,10 @@ def process_batch(model: FastLanguageModel,
         use_cache=True,
         max_new_tokens=config.max_new_tokens,
         temperature=config.temperature,
+        top_k=config.top_k,
+        min_p=config.min_p,
+        top_p=config.top_p,
+        repetition_penalty=config.repetition_penalty,
         do_sample=True,
         num_return_sequences=num_variations
     )
@@ -88,8 +91,6 @@ def main():
     )
     
     FastLanguageModel.for_inference(model)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.to(device)
     
     df = pd.read_csv(args.input_csv)
     if args.column not in df.columns:
