@@ -1,4 +1,5 @@
 import torch
+import math
 import argparse
 import pandas as pd
 from unsloth import FastLanguageModel
@@ -29,6 +30,7 @@ def process_batch(model: FastLanguageModel,
         for text in texts
     ]
     
+    print("messages", messages)
     prompts = [tokenizer.apply_chat_template(message, tokenize=False, add_generation_prompt=True) for message in messages]
     
     tokenizer.padding_side = "left"
@@ -68,6 +70,7 @@ def process_batch(model: FastLanguageModel,
          for output in generated_outputs[i * num_variations : (i + 1) * num_variations]]
         for i in range(len(texts))
     ]
+    print("processed text: ", processed_texts)
     return processed_texts
 
 def main():
@@ -85,9 +88,11 @@ def main():
     base_prompt = get_prompt(args.prompt_path)
     
     print("Loading model and tokenizer...")
+    # Doesn't seem to be a difference when using vllm
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=config.model_name,
-        max_seq_length=config.max_seq_length
+        max_seq_length=config.max_seq_length,
+        #fast_inference=True
     )
     
     FastLanguageModel.for_inference(model)
@@ -97,13 +102,22 @@ def main():
         raise ValueError(f"The input CSV file must contain a '{args.column}' column with text data.")
     
     results = []
+    total_batches = math.ceil(len(df) / args.batch_size)
+
     for i in range(0, len(df), args.batch_size):
+        batch_num = i // args.batch_size + 1
+        print(f"Processing batch {batch_num} of {total_batches}")
+        
         batch_texts = df[args.column].iloc[i:i + args.batch_size].tolist()
         batch_results = process_batch(model, tokenizer, batch_texts, base_prompt, config, args.num_variations)
         results.extend(batch_results)
+        
+        # Save intermediate results
+        df_subset = df.iloc[:i + len(batch_results)].copy()
+        df_subset["processed_outputs"] = results
+        df_subset.to_csv(args.output_csv, index=False)
+        print(f"Saved up to batch {batch_num} to {args.output_csv}")
     
-    df["processed_outputs"] = results
-    df.to_csv(args.output_csv, index=False)
     print(f"Processed data saved to {args.output_csv}")
 
 if __name__ == "__main__":
