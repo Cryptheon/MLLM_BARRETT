@@ -1,8 +1,8 @@
-model_path: "../../../hf_models/gemma-3-27b-it-GGUF/gemma-3-27b-it-Q4_K_M.gguf"
+model_name: "unsloth/Llama-3.3-70B-Instruct-bnb-4bit"
 max_seq_length: 128000
 max_new_tokens: 4096
 seed: 1111
-temperature: 1.0
+temperature: 0.8
 top_k: 64
 min_p: 0.00
 top_p: 0.95
