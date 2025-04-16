@@ -32,7 +32,7 @@ def process_batch(model: Llama,
         for _ in range(num_variations):
             output = model.create_chat_completion(
                 messages=messages,
-                max_tokens=config.max_new_tokens,
+                #max_tokens=config.max_new_tokens,
                 temperature=config.temperature,
                 top_k=config.top_k,
                 top_p=config.top_p,
@@ -74,6 +74,7 @@ def main():
     model = Llama(model_path=config.model_path, 
                   n_gpu_layers=config.n_gpu_layers,
                   flash_attn=True,
+                  n_ctx=8192,
                   chat_format=config.chat_format)
     
     df = pd.read_csv(args.input_csv)

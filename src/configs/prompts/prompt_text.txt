@@ -1,1 +1,0 @@
-Hi, could you tell me the difference between quantun mechanics, quantum gravity and explain in depth why the universe seems to be inherently probabilistic in quantum mechanics, how that's just an interpretation accepted, but the model could be wrong and how that relates to neural networks and their universality (universal approximation theorem).
