@@ -1,0 +1,65 @@
+Given a pathology report, extract only the histology-based findings that can be directly observed in microscopic images. Remove any metadata that is not visually inferable. Focus on tumor type, architecture, cellular characteristics, nuclear features, presence of necrosis, invasion into adjacent structures, and margin involvement. Exclude macroscopic descriptions, exact distances, molecular data, and immunohistochemistry results. Ensure the output is concise and formatted to facilitate training of a vision-language model on histology images.
+
+Follow the following steps:
+
+#### 1. General Approach to Preprocessing Pathology Reports
+- Remove all metadata that is not visually inferable from histology images.
+  - Exclude patient details, submission dates, procedure details, laterality, and accession numbers.
+- Focus only on histology-based findings that can be derived from whole-slide images (WSIs) or biopsy scans.
+- Avoid macroscopic descriptions (e.g., gross specimen color, size, weight, and shape) unless those features can be directly observed under a microscope.
+- Preserve only morphologically relevant details that a model could learn to recognize in histology images.
+
+#### 2. Tumor Identification and Classification
+- Identify the histologic tumor type(s) (e.g., papillary renal cell carcinoma, chromophobe renal cell carcinoma).
+- Include architectural and cellular characteristics visible in histology, such as:
+  - Growth patterns (papillary, solid, glandular, trabecular, etc.).
+  - Cell shape (polygonal, spindle, round, etc.).
+  - Cytoplasmic characteristics (clear, eosinophilic, granular, vacuolated, etc.).
+  - Nuclear features (pleomorphism, hyperchromasia, nucleoli prominence).
+  - Presence of mitotic figures and atypical mitoses.
+
+#### 3. Tumor Grading (If Applicable)
+- Provide the histologic grade but ensure it is justified with visual criteria.
+  - If using a system like Fuhrman, ISUP, or Gleason, include nuclear features, mitotic activity, and architectural patterns.
+  - Example: Instead of stating "G2 tumor", specify "Moderate pleomorphism with occasional mitotic figures".
+- Exclude non-visual grading criteria that rely on molecular or clinical factors.
+
+#### 4. Tumor Extension and Invasion
+- Describe whether the tumor is confined to the organ or extends beyond it.
+  - Example: "Tumor remains within renal parenchyma" or "Tumor infiltrates surrounding adipose tissue."
+- Identify any invasion into adjacent structures visible in histology.
+  - Capsular invasion
+  - Lymphovascular invasion (tumor cells inside blood or lymphatic vessels)
+  - Perineural invasion (tumor cells surrounding nerves)
+
+#### 5. Tumor Necrosis and Additional Features
+- Indicate the presence or absence of necrosis.
+  - Example: "Foci of coagulative necrosis present" or "No necrosis observed."
+- Identify specific tissue responses, such as:
+  - Desmoplastic reaction (fibrosis around tumor).
+  - Inflammatory infiltrates (lymphocytes, plasma cells, etc.).
+  - Sarcomatoid transformation (if present, describe morphology).
+
+#### 6. Margin Status (Without Absolute Distances)
+- State whether tumor cells are present at the resection margin.
+  - Example: "Tumor cells reach the inked margin" or "No tumor involvement at the inked margin."
+- Avoid specifying exact distances (e.g., “Tumor is 1 mm from margin”) unless the dataset includes precise annotations for spatial measurements.
+
+#### 7. Exclusion of Non-Visual Data
+- Do NOT include:
+  - TNM staging (since nodal and metastatic involvement is not determined solely from histology).
+  - Immunohistochemistry results (as IHC markers are not visible in H&E-stained images).
+  - Genetic or molecular findings (e.g., mutations, copy number variations).
+  - Clinical diagnosis, patient history, or any preoperative information.
+  - Radiological, endoscopic, or macroscopic descriptions unless they directly correlate with histology.
+
+#### 8. Format of the Processed Report for a Vision-Language System
+- The processed output should contain:
+  - Histologic tumor type(s) with visual characteristics.
+  - Grading (if applicable) with histology-based justification.
+  - Tumor confinement or invasion status.
+  - Necrosis, margin involvement, and additional tumor features.
+- Information should be written clearly and concisely while maintaining detail relevant to image-based learning.
+
+# The Report you need to reformat:
+{}
