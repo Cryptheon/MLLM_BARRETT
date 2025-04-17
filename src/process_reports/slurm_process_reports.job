@@ -2,7 +2,7 @@
 #SBATCH --job-name=llama_70B_reports
 #SBATCH --output=./slurm/llama_70B_%j.out
 #SBATCH --error=./slurm/llama_70B_%j.err
-#SBATCH --time=00:05:00
+#SBATCH --time=05:00:00
 #SBATCH --partition=gpu_h100
 #SBATCH --gpus=4
 #SBATCH --ntasks=1
@@ -15,7 +15,7 @@ source ../../../venv/bin/activate
 CONFIG=../configs/model_inference/Llama-3.3-70B-instruct-GGUF.yaml
 PROMPT=../configs/prompts/histopathology_report_cleaning_prompt.txt
 INPUT=../data/tcga_data/tcga_reports/TCGA_Reports.csv
-OUTPUT=test_histopathology_reports
+OUTPUT=histopathology_reports
 COLUMN=text
 
 # Define start/end indices
@@ -44,3 +44,10 @@ done
 
 wait
 echo "All report processing jobs completed."
+
+# Concatenate final output
+python concatenate_processed_reports.py \
+  --output_csv "./output_reports/${OUTPUT}.csv" \
+  --partial_glob "./output_reports/${OUTPUT}_gpu*.csv"
+
+echo "Final concatenated file saved to ${OUTPUT}"
