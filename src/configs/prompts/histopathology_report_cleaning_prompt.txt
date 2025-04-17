@@ -1,4 +1,4 @@
-Given a pathology report, extract only the histology-based findings that can be directly observed in microscopic images. Remove any metadata that is not visually inferable. Focus on type, architecture, cellular characteristics, nuclear features, presence of necrosis, invasion into adjacent structures, and margin involvement. Exclude macroscopic descriptions, exact distances, molecular data, and immunohistochemistry results. Ensure the output is concise and formatted to facilitate training of a vision-language model on histology images. 
+Given a pathology report, extract only the histology-based findings that can be directly observed in microscopic images. Remove any metadata that is not visually inferable. Focus on type, architecture, cellular characteristics, nuclear features, presence of necrosis, invasion into adjacent structures, and margin involvement. Exclude macroscopic descriptions, exact distances, molecular data, and immunohistochemistry results. Ensure the output is concise and formatted to facilitate training of a vision-language model on histology images. Do not include size in centimers (cm) or diameters.
 
 Try to keep the same language as the pathologist used in the report. Do not change/modify or transform the report too much! Give the report in running text.
 
@@ -136,4 +136,4 @@ Wording should closely match the language used in original reports to ensure ali
 
 "{}"
 
- Only give the modified report in runing text! nothing else!
+ Only give the modified report in runing text! nothing else! Remember: don't include sizes, dimensions or diameters (no cm or centimeters).
