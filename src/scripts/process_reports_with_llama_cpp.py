@@ -84,19 +84,25 @@ def main():
     results = []
     total_batches = math.ceil(len(df) / args.batch_size)
     # llama-cpp-python: WE CAN ONLY DO BATCH SIZE of 1
+    start_time = time.time()
     for i in range(0, len(df), args.batch_size):
         batch_num = i // args.batch_size + 1
         print(f"Processing batch {batch_num} of {total_batches}")
         
         batch_texts = df[args.column].iloc[i:i + args.batch_size].tolist()
         batch_results = process_batch(model, batch_texts, base_prompt, config, args.num_variations)
-        results.extend(batch_results)
-        
-        # Save intermediate results
-        df_subset = df.iloc[:i + len(batch_results)].copy()
+
+        batch_flattened = [res[0] for res in batch_results]
+        results.extend(batch_flattened)
+
+        # Save intermediate results only for processed rows so far
+        df_subset = df.iloc[:i + len(batch_flattened)].copy()
         df_subset["processed_outputs"] = results
+        df_subset = df_subset.loc[:, ~df_subset.columns.str.contains('^Unnamed')]
         df_subset.to_csv(args.output_csv, index=False)
         print(f"Saved up to batch {batch_num} to {args.output_csv}")
+
+    print(f"Time of Total Execution: {(time.time()-start_time):.2f}")
 
     print(f"All data processed and saved to {args.output_csv}")
 
