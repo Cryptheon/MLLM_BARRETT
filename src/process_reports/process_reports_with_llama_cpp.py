@@ -64,7 +64,7 @@ def main():
     model = Llama(model_path=config.model_path, 
                   n_gpu_layers=config.n_gpu_layers,
                   flash_attn=True,
-                  n_ctx=8192,
+                  n_ctx=8192*2,
                   chat_format=config.chat_format)
 
     df = pd.read_csv(args.input_csv)
