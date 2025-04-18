@@ -14,3 +14,4 @@ h5py
 PyYAML
 tensorboard
 wandb
+llama-cpp-python

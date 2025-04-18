@@ -1,0 +1,53 @@
+#!/bin/bash
+#SBATCH --job-name=llama_70B_reports
+#SBATCH --output=./slurm/llama_70B_%j.out
+#SBATCH --error=./slurm/llama_70B_%j.err
+#SBATCH --time=05:00:00
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=4
+#SBATCH --ntasks=1
+
+module load 2024
+module load cuDNN/9.5.0.50-CUDA-12.6.0
+
+source ../../../venv/bin/activate
+
+CONFIG=../configs/model_inference/Llama-3.3-70B-instruct-GGUF.yaml
+PROMPT=../configs/prompts/histopathology_report_cleaning_prompt.txt
+INPUT=../data/tcga_data/tcga_reports/TCGA_Reports.csv
+OUTPUT=histopathology_reports
+COLUMN=text
+
+# Define start/end indices
+TOTAL=9523
+CHUNK=$(( (TOTAL + 3) / 4 ))  # Round up for 4 chunks
+
+# Launch 4 processes in the background, each tied to one GPU
+for GPU in {0..3}; do
+  START=$(( CHUNK * GPU ))
+  END=$(( CHUNK * (GPU + 1) ))
+  if [ $END -gt $TOTAL ]; then END=$TOTAL; fi
+
+  echo "Launching GPU $GPU: rows $START to $END"
+
+  CUDA_VISIBLE_DEVICES=$GPU \
+  python process_reports_with_llama_cpp.py \
+    --config $CONFIG \
+    --prompt_path $PROMPT \
+    --input_csv $INPUT \
+    --output_csv ./output_reports/${OUTPUT}_gpu${GPU}.csv \
+    --column $COLUMN \
+    --start_idx $START \
+    --end_idx $END \
+    --gpu $GPU &
+done
+
+wait
+echo "All report processing jobs completed."
+
+# Concatenate final output
+python concatenate_processed_reports.py \
+  --output_csv "./output_reports/${OUTPUT}.csv" \
+  --partial_glob "./output_reports/${OUTPUT}_gpu*.csv"
+
+echo "Final concatenated file saved to ${OUTPUT}"
