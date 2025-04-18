@@ -1,0 +1,36 @@
+model:
+  core_model_name: "./pathollama_train/checkpoint-835/"
+  vocab_size: 128256
+  hidden_size: 768
+  num_hidden_layers: 2
+  num_attention_heads: 2
+  max_position_embeddings: 4096
+
+dataset:
+  pickle_file_path: "./data/tcga_data/tcga_titan_embeddings_reports_processed.pkl"
+  embeddings_dim_size: 768
+  max_seq_length: 512
+
+training:
+  output_dir: "./pathollama_train"
+  eval_strategy: "epoch"
+  do_train: true
+  do_eval: false
+  save_strategy: "steps"
+  save_steps: 400
+  logging_steps: 1
+  lr_scheduler_type: "linear"
+  logging_strategy: "steps"
+  #logging_dir: "./runs"
+  per_device_train_batch_size: 64
+  per_device_eval_batch_size: 1
+  num_train_epochs: 5
+  learning_rate: 0.001
+  dataloader_num_workers: 12
+  fp16: false
+  bf16: true
+  remove_unused_columns: false
+  disable_tqdm: false
+  report_to: ["tensorboard"]
+
+
