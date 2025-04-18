@@ -22,7 +22,10 @@ def extract_patient_id_from_embedding(filename: str) -> str:
     splitted = filename.split("-")
     return '-'.join(splitted[:3])  # Extract 'TCGA-XX-YYYY'
 
-def merge_embeddings_with_reports(embeddings_file: str, reports_file: str, output_file: str):
+def merge_embeddings_with_reports(embeddings_file: str, 
+                                  reports_file: str, 
+                                  output_file: str,
+                                  report_text_column: str):
     """Merges the embeddings with the clinical reports and saves the result as a pickle file, grouped per patient."""
     
     # Load data
@@ -48,19 +51,26 @@ def merge_embeddings_with_reports(embeddings_file: str, reports_file: str, outpu
     for _, row in reports_df.iterrows():
         patient_id = row["patient_id"]
         patient_data[patient_id]["report_filename"] = row["patient_filename"]
-        patient_data[patient_id]["report_text"] = row["text"]
+        patient_data[patient_id]["report_text"] = row[report_text_column]
 
     # Store embeddings per patient
     for filename, embedding in zip(embedding_filenames, embedding_vectors):
         patient_id = extract_patient_id_from_embedding(filename)
         # should have a check if the patient_id exists in the reports_df, else
         # we can be storing embeddings for a patient for which there is no report.
+        # Right now, we will filter it afterwards
         patient_data[patient_id]["embedding_filenames"].append(filename)
         patient_data[patient_id]["embeddings"].append(embedding)
 
+    # Filter out patients without both a report and at least one embedding
+    filtered_data = {
+        pid: data for pid, data in patient_data.items()
+        if data["report_text"] is not None and len(data["embeddings"]) > 0
+    }
+
     # Save merged data as a pickle file
     with open(output_file, 'wb') as file:
-        pickle.dump(dict(patient_data), file)  # Convert defaultdict to dict before saving
+        pickle.dump(filtered_data, file)  # Convert defaultdict to dict before saving
 
     print(f"\nMerged dataset saved to {output_file}")
     print(f"Total unique patients: {len(patient_data)}")
@@ -70,10 +80,15 @@ def main():
     parser.add_argument("--embeddings_file_path", type=str, required=True, help="Path to the embeddings .pkl file")
     parser.add_argument("--reports_file_path", type=str, required=True, help="Path to the clinical reports .csv file")
     parser.add_argument("--output_file_path", type=str, required=True, help="Path to save the merged output .pkl file")
+    parser.add_argument("--report_text_column", type=str, required=True, help="Name of the column to use for report text")
+
 
     args = parser.parse_args()
 
-    merge_embeddings_with_reports(args.embeddings_file_path, args.reports_file_path, args.output_file_path)
+    merge_embeddings_with_reports(args.embeddings_file_path, 
+                                  args.reports_file_path, 
+                                  args.output_file_path,
+                                  args.report_text_column)
 
 if __name__ == "__main__":
     main()

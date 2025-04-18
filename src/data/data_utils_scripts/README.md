@@ -15,10 +15,11 @@ This script merges TCGA clinical reports with image embeddings, grouping data by
 
 #### Running the script:
 ```sh
-python data_utils_scripts/merge_embeddings_reports_files.py \
-  --embeddings_file_path ./tcga_titan_features/TCGA_TITAN_features.pkl \
-  --reports_file_path ./tcga_reports/TCGA_Reports.csv \
-  --output_file_path tcga_titan_embeddings_reports.pkl
+python ./data_utils_scripts/merge_embeddings_reports_files.py \
+  --embeddings_file_path ./tcga_data/tcga_titan_features/TCGA_TITAN_features.pkl \
+  --reports_file_path ./tcga_data/tcga_reports/tcga_processed_reports.csv \
+  --output_file_path tcga_titan_embeddings_reports.pkl \
+  --report_text_column processed_report
 ```
 
 #### Output:
