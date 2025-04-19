@@ -49,8 +49,7 @@ class PathoLlamaForCausalLM(LlamaForCausalLM):
 
         for i in range(batch_size):
             text_ids = input_ids[i]
-            # chop the EOS token off for Causal LM
-            txt_embeds = model.embed_tokens(text_ids[:-1])
+            txt_embeds = model.embed_tokens(text_ids)
             wsi_embeds = wsi_embeddings[i]
             
             # new_embeds looks like: [wsi_embeds, bos, txt_embeds, eos]
@@ -62,7 +61,7 @@ class PathoLlamaForCausalLM(LlamaForCausalLM):
             text_labels = text_ids.clone() if labels is None else labels[i]
             labels_i = torch.cat([
                 torch.full((num_wsi,), IGNORE_INDEX, device=device, dtype=text_labels.dtype),
-                text_labels[1:],  # Shift labels for causal LM
+                text_labels,  # No need to Shift labels for causal LM, huggingface does this internally
             ], dim=0)
             new_labels_list.append(labels_i)
         
@@ -120,8 +119,8 @@ class PathoLlamaForCausalLM(LlamaForCausalLM):
             input_ids = None
             # for generation we don't need to compute against the labels  
             labels = None
-
-        # inputs_embeds is already available during inference
+            
+        # inputs_embeds is already available during autoregression
         # During a training forward pass inputs_embeds is None.
         # So we have to construct it.
         else:
@@ -161,14 +160,73 @@ class PathoLlamaForCausalLM(LlamaForCausalLM):
 
         if wsi_embeddings is not None:
             inputs, position_ids, attention_mask, _, inputs_embeds, _ = self.prepare_inputs_labels_for_multimodal(
-                inputs, position_ids, attention_mask, None, None, wsi_embeddings,
+                inputs, 
+                position_ids, 
+                attention_mask, 
+                None, 
+                None, 
+                wsi_embeddings,
                 tokenizer_model_max_length=getattr(self.config, "tokenizer_model_max_length", None),
-                padding_side="left"
+                padding_side="right"
             )
         else:
             inputs_embeds = self.get_model().embed_tokens(inputs)
 
-        return super().generate(
-            position_ids=position_ids, attention_mask=attention_mask,
-            inputs_embeds=inputs_embeds, input_ids=inputs, **kwargs
-        )
+
+        return super().generate(position_ids=position_ids, 
+                                attention_mask=attention_mask,
+                                use_cache=True,
+                                inputs_embeds=inputs_embeds, 
+                                input_ids=inputs, 
+                                **kwargs)
+    
+    # @torch.no_grad()
+    # def custom_generate(self,
+    #             input_ids: torch.Tensor,
+    #             wsi_embeddings: torch.Tensor,
+    #             temperature: float = 1.0,
+    #             max_new_tokens: int = 50,
+    #             eos_token_id: int = None):
+    #     """
+    #     Custom generate() without past_key_values. Recomputes full sequence each step.
+        
+    #     Args:
+    #         input_ids: Tensor of shape [B, T_text]
+    #         wsi_embeddings: Tensor of shape [B, N_wsi, D]
+    #         tokenizer: Tokenizer to embed input_ids
+    #         temperature: Sampling temperature
+    #         max_new_tokens: Max new tokens to generate
+    #         eos_token_id: Token ID to stop generation (e.g. tokenizer.eos_token_id)
+
+    #     Returns:
+    #         Tensor of shape [B, T_text + max_new_tokens]
+    #     """
+    #     device = input_ids.device
+    #     batch_size = input_ids.size(0)
+
+    #     generated_ids = input_ids.clone()
+
+    #     for step in range(max_new_tokens):
+    #         # Rebuild full embeddings: [WSI, input_ids, gen_1, ..., gen_n]
+    #         text_embeds = self.get_model().embed_tokens(generated_ids)
+    #         full_embeds = torch.cat([wsi_embeddings, text_embeds], dim=1)  # [B, total_len, D]
+    #         attention_mask = torch.ones(full_embeds.size()[:2], dtype=torch.bool, device=device)
+
+    #         outputs = super().forward(
+    #             inputs_embeds=full_embeds,
+    #             attention_mask=attention_mask,
+    #             use_cache=False,
+    #             return_dict=True
+    #         )
+
+    #         logits = outputs.logits[:, -1, :]  # take last token
+    #         next_token = torch.softmax(logits / temperature, dim=-1).multinomial(num_samples=1)  # [B, 1]
+
+    #         # Append token
+    #         generated_ids = torch.cat([generated_ids, next_token], dim=1)
+
+    #         # Stop if EOS
+    #         if eos_token_id is not None and (next_token == eos_token_id).all():
+    #             break
+
+    #     return generated_ids
