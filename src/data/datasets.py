@@ -40,7 +40,7 @@ class PathoMultiModalDataset(Dataset):
         self,
         pickle_file: str,
         tokenizer: PreTrainedTokenizer,
-        max_seq_length: int = 512,
+        max_seq_length: int = 1024,
         embeddings_dim_size: int = 768
     ) -> None:
         super().__init__()
