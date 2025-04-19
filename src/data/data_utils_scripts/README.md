@@ -52,3 +52,21 @@ Total Embeddings: 2
 ```
 
 
+### 3. `split_data_train_val.py`
+This script splits the merged dataset into training and validation sets.
+
+#### Functionality:
+- Loads the merged `.pkl` dataset.
+- Randomly selects 200 patients for validation.
+- Saves the remaining patients as the training set.
+- Outputs two new `.pkl` files: one for training and one for validation.
+
+#### Running the script:
+```sh
+python data_utils_scripts/split_data_train_val.py \
+  --merged_file_path tcga_titan_embeddings_reports.pkl \
+  --train_file_path tcga_train.pkl \
+  --val_file_path tcga_val.pkl
+```
+
+
