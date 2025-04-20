@@ -19,7 +19,7 @@ python ./data_utils_scripts/merge_embeddings_reports_files.py \
   --embeddings_file_path ./tcga_data/tcga_titan_features/TCGA_TITAN_features.pkl \
   --reports_file_path ./tcga_data/tcga_reports/tcga_processed_reports.csv \
   --output_file_path tcga_titan_embeddings_reports.pkl \
-  --report_text_column processed_report
+  --report_text_column processed_reports
 ```
 
 #### Output:

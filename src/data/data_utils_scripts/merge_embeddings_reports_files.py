@@ -65,7 +65,7 @@ def merge_embeddings_with_reports(embeddings_file: str,
     # Filter out patients without both a report and at least one embedding
     filtered_data = {
         pid: data for pid, data in patient_data.items()
-        if data["report_text"] is not None and len(data["embeddings"]) > 0
+        if data["reports"] is not None and len(data["embeddings"]) > 0
     }
 
     # Save merged data as a pickle file

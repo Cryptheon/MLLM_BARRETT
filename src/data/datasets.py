@@ -65,7 +65,8 @@ class PathoMultiModalDataset(Dataset):
         patient_id = self.patient_ids[idx]
         patient = self.data[patient_id]
 
-        text: str = patient["report_text"]
+        text_variations: str = patient["reports"]
+        text: str = random.choice(text_variations)
         wsi_embeddings = torch.tensor(np.array(patient["embeddings"]))  # List of tensors
         
         if text is None or len(wsi_embeddings)==0 :

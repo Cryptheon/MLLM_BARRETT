@@ -23,7 +23,7 @@ def show_patient(merged_file: str):
 
     print(f"\nFirst Patient in Merged Dataset: {patient_id}")
     print(f"Report Filename: {patient_data['report_filename']}")
-    print(f"Report Text: {patient_data['report_text'][:100]}...")  # Show only first 100 chars
+    print(f"Report Text: {patient_data['reports'][:100]}...")  # Show only first 100 chars
     print(f"Total Embeddings: {len(patient_data['embeddings'])}")
 
     for i, (filename, emb) in enumerate(zip(patient_data["embedding_filenames"], patient_data["embeddings"])):

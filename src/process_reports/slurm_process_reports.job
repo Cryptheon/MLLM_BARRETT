@@ -2,7 +2,7 @@
 #SBATCH --job-name=llama_70B_reports
 #SBATCH --output=./slurm/llama_70B_%j.out
 #SBATCH --error=./slurm/llama_70B_%j.err
-#SBATCH --time=05:00:00
+#SBATCH --time=15:00:00
 #SBATCH --partition=gpu_h100
 #SBATCH --gpus=4
 #SBATCH --ntasks=1
@@ -14,7 +14,7 @@ source ../../../venv/bin/activate
 
 CONFIG=../configs/model_inference/Llama-3.3-70B-instruct-GGUF.yaml
 PROMPT=../configs/prompts/histopathology_report_cleaning_prompt.txt
-INPUT=../data/tcga_data/tcga_reports/TCGA_Reports.csv
+INPUT=../data/tcga_data/tcga_reports/tcga_reports.csv
 OUTPUT=histopathology_reports
 COLUMN=text
 
@@ -39,6 +39,7 @@ for GPU in {0..3}; do
     --column $COLUMN \
     --start_idx $START \
     --end_idx $END \
+    --num_variations 3 \
     --gpu $GPU &
 done
 
