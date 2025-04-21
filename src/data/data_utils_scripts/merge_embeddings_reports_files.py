@@ -39,7 +39,7 @@ def merge_embeddings_with_reports(embeddings_file: str,
     # Create a dictionary that maps patient IDs to multiple embeddings
     patient_data = defaultdict(lambda: {
         "report_filename": None,
-        "report_text": None,
+        "reports": [],
         "embedding_filenames": [],
         "embeddings": []
     })
@@ -51,7 +51,7 @@ def merge_embeddings_with_reports(embeddings_file: str,
     for _, row in reports_df.iterrows():
         patient_id = row["patient_id"]
         patient_data[patient_id]["report_filename"] = row["patient_filename"]
-        patient_data[patient_id]["report_text"] = row[report_text_column]
+        patient_data[patient_id]["reports"] = row[report_text_column]
 
     # Store embeddings per patient
     for filename, embedding in zip(embedding_filenames, embedding_vectors):
@@ -65,7 +65,7 @@ def merge_embeddings_with_reports(embeddings_file: str,
     # Filter out patients without both a report and at least one embedding
     filtered_data = {
         pid: data for pid, data in patient_data.items()
-        if data["reports"] is not None and len(data["embeddings"]) > 0
+        if len(data["reports"]) > 0 and len(data["embeddings"]) > 0
     }
 
     # Save merged data as a pickle file
