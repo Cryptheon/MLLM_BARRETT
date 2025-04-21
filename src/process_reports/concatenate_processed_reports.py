@@ -14,18 +14,34 @@ def main():
     parser.add_argument("--partial_glob", type=str, default="*_gpu*.csv", help="Glob pattern to find partial CSV files.")
     args = parser.parse_args()
 
+    expected_columns = ["patient_filename", "text", "processed_reports"]
     partial_files = sorted(glob.glob(args.partial_glob), key=extract_gpu_index)
 
     if not partial_files:
         raise ValueError("No matching GPU-partial CSV files found!")
 
     print(f"Found {len(partial_files)} files. Concatenating in order: {partial_files}")
-    dfs = [pd.read_csv(f) for f in partial_files]
+    
+    dfs = []
+    for f in partial_files:
+        df = pd.read_csv(f)
+
+        # Add any missing expected columns with empty strings
+        for col in expected_columns:
+            if col not in df.columns:
+                df[col] = ""
+
+        # Remove unexpected columns and reorder
+        df = df[expected_columns]
+        dfs.append(df)
+
     final_df = pd.concat(dfs, ignore_index=True)
+
+    # Optional: check and clean up trailing whitespace
+    final_df = final_df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
 
     final_df.to_csv(args.output_csv, index=False)
     print(f"Saved combined report to {args.output_csv}")
 
 if __name__ == "__main__":
     main()
-

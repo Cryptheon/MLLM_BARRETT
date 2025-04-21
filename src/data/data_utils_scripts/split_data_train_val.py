@@ -51,7 +51,10 @@ def main():
 
     args = parser.parse_args()
 
-    split_dataset(args.merged_file_path, args.train_file_path, args.val_file_path)
+    split_dataset(args.merged_file_path, 
+                  args.train_file_path, 
+                  args.val_file_path,
+                  args.validation_amount)
 
 if __name__ == "__main__":
     main()
