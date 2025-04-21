@@ -76,22 +76,25 @@ def main():
     df_slice = df.iloc[args.start_idx:end_idx].copy()
 
     start_time = time.time()
+    
+    out_path = args.output_csv.replace(".csv", f"_gpu{args.gpu}.csv")
+    write_header = not os.path.exists(out_path)
+
     for i in range(0, len(df_slice), args.batch_size):
         print(f"Processing row {args.start_idx + i}/{end_idx}")
 
         row_text = df_slice.iloc[i][args.column]
-        batch_results = process_batch(model, [row_text], base_prompt, config, args.num_variations)  # returns a list of 1 item
+        batch_results = process_batch(model, [row_text], base_prompt, config, args.num_variations)
 
-        # Extract the inner list of variations
         variations = batch_results[0]
-
-        # Create a DataFrame with one row
-        row_df = df_slice.iloc[[i]].copy()
+        row_df = df_slice.iloc[[i]][["patient_filename", args.column]].copy()
         row_df["processed_reports"] = [json.dumps(variations)]
-        row_df = row_df.loc[:, ~row_df.columns.str.contains('^Unnamed')]
-        out_path = args.output_csv.replace(".csv", f"_gpu{args.gpu}.csv")
-        write_header = not os.path.exists(out_path) and i == 0
-        row_df.to_csv(out_path, index=False, mode='a' if i > 0 else 'w', header=write_header)
+
+        # Ensure correct column order
+        row_df = row_df[["patient_filename", args.column, "processed_reports"]]
+
+        row_df.to_csv(out_path, index=False, mode='a', header=write_header)
+        write_header = False  # Only write header for the first batch
 
         print(f"Saved batch {i} to {out_path}")
 
