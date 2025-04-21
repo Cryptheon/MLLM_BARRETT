@@ -4,18 +4,18 @@ model:
   model_path: "./pathollama_train/checkpoint-5240/"
   vocab_size: 128256
   hidden_size: 768
-  num_hidden_layers: 2
-  num_attention_heads: 2
+  num_hidden_layers: 4
+  num_attention_heads: 4
   max_position_embeddings: 4096
 
 dataset:
-  pickle_file_path: "./data/tcga_data/tcga_titan_embeddings_reports_processed.pkl"
+  pickle_file_path: "./data/tcga_data/split/Llama-3.3-70B-processed-200-split/tcga_val_processed.pkl"
   embeddings_dim_size: 768
   max_seq_length: 2048
 
 inference:
-  model_path: "./pathollama_train/checkpoint-4000-2-layers/model.safetensors"
-  temperature: 0.5
+  model_path: "./pathollama_train/checkpoint-2560/model.safetensors"
+  temperature: 0.9
   top_k: 64
   min_p: 0.00
   top_p: 0.95
