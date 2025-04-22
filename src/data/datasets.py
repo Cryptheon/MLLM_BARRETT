@@ -66,8 +66,9 @@ class PathoMultiModalDataset(Dataset):
     def __getitem__(self, idx: int) -> Dict[str, Any]:
         patient_id = self.patient_ids[idx]
         patient = self.data[patient_id]
-
         text_variations: str = patient["reports"]
+        text_variations = eval(text_variations)
+
         if self.random_choice_report:
             text: str = random.choice(text_variations)
         else:

@@ -25,17 +25,7 @@ def load_config(path: str) -> dict:
     with open(path, 'r') as file:
         return yaml.safe_load(file)
 
-
-def main():
-    parser = argparse.ArgumentParser(description="Run inference on PathoLlama model with multimodal data")
-    parser.add_argument('--config', type=str, default="./configs/tcga/config.yaml", help='Path to config YAML file')
-    parser.add_argument('--patient', type=str, default=None, help='Patient ID to use (optional, will sample if not provided)')
-    args = parser.parse_args()
-
-    config = load_config(args.config)
-    logger.info("Configuration loaded from %s", args.config)
-    logger.info("Full config:\n%s", yaml.dump(config, sort_keys=False))
-
+def load_model_tokenizer(config):
     # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained(config["tokenizer"]["tokenizer_name"])
     tokenizer.pad_token = tokenizer.eos_token
@@ -55,16 +45,24 @@ def main():
     logger.info("Trainable parameters: %s", f"{trainable_params:,}")
     logger.info("Total parameters: %s", f"{total_params:,}")
     logger.info("Approx. model size: %.2f MB", total_mb)
+    return model, tokenizer
 
+def load_data(config, tokenizer):
     # Load dataset
     dataset = PathoMultiModalDataset(
-        pickle_file=config["dataset"]["pickle_file_path"],
+        pickle_file=config["dataset"]["val_pickle_file_path"],
         max_seq_length=config["dataset"]["max_seq_length"],
         embeddings_dim_size=config["dataset"]["embeddings_dim_size"],
-        tokenizer=tokenizer
-    )
-    logger.info("Dataset loaded from %s", config["dataset"]["pickle_file_path"])
+        tokenizer=tokenizer,
+        random_choice_report=config["dataset"]["random_choice_report"]
 
+    )
+    logger.info("Dataset loaded from %s", config["dataset"]["val_pickle_file_path"])
+
+    return dataset
+
+def get_data(config, tokenizer, dataset, args):
+    
     if args.patient and args.patient in dataset.patient_ids:
         patient_id = args.patient
     else:
@@ -72,8 +70,18 @@ def main():
         logger.info("Randomly sampled patient ID: %s", patient_id)
 
     patient_data = dataset.data[patient_id]
-    original_text = patient_data["report_text"]
+    text_variations = patient_data["reports"]
+    text_variations = eval(text_variations)
+    if config["dataset"]["random_choice_report"]:
+        original_text: str = random.choice(text_variations)
+    else:
+        original_text = text_variations[0]
+    
     wsi_embeddings = torch.tensor(patient_data["embeddings"]).unsqueeze(0)  # Add batch dimension
+
+    return wsi_embeddings, original_text, patient_id
+
+def generate(model, tokenizer, wsi_embeddings, input_ids, config):
 
     # Tokenize prompt
     input_tokens = tokenizer("", 
@@ -83,9 +91,6 @@ def main():
     
     input_ids = input_tokens["input_ids"].to(model.device)
     wsi_embeddings = wsi_embeddings.to(model.device)
-
-    # Display input
-    console.print(Panel(original_text, title=f"[bold green]Original Report: {patient_id}", box=box.DOUBLE))
 
     # Generate prediction
     logger.info("Running inference...")
@@ -102,6 +107,28 @@ def main():
             tokenizer=tokenizer
         )
     generated_text = tokenizer.decode(generated[0], skip_special_tokens=False)
+    return generated_text
+
+def main():
+    parser = argparse.ArgumentParser(description="Run inference on PathoLlama model with multimodal data")
+    parser.add_argument('--config', type=str, default="./configs/tcga/config.yaml", help='Path to config YAML file')
+    parser.add_argument('--patient', type=str, default=None, help='Patient ID to use (optional, will sample if not provided)')
+    args = parser.parse_args()
+
+    config = load_config(args.config)
+    logger.info("Configuration loaded from %s", args.config)
+    logger.info("Full config:\n%s", yaml.dump(config, sort_keys=False))
+
+    model, tokenizer = load_model_tokenizer(config)
+
+    dataset = load_data(config, tokenizer)
+
+    wsi_embeddings, original_text, patient_id = get_data(config, tokenizer, dataset, args)
+
+    # Display input
+    console.print(Panel(original_text, title=f"[bold green]Original Report: {patient_id}", box=box.DOUBLE))
+
+    generated_text = generate(model, tokenizer, wsi_embeddings, original_text)
 
     # Display output
     console.print(Panel(generated_text, title="[bold blue]Generated Text", box=box.DOUBLE))
