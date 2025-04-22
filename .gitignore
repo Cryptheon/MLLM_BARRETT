@@ -177,3 +177,6 @@ data/tcga_data/
 
 # PyPI configuration file
 .pypirc
+
+# conch
+CONCH/
