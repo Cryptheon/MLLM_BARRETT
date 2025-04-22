@@ -2,20 +2,22 @@ model:
   core_model_name: "meta-llama/Meta-Llama-3-8B"
   vocab_size: 128256
   hidden_size: 768
-  num_hidden_layers: 4
-  num_attention_heads: 4
+  num_hidden_layers: 2
+  num_attention_heads: 2
   max_position_embeddings: 1024
 
 dataset:
-  pickle_file_path: "./data/tcga_data/split/Llama-3.3-70B-processed-200-split-variations/tcga_train_variations.pkl"
+  train_pickle_file_path: "./data/tcga_data/split/Llama-3.3-70B-processed-200-split-variations/tcga_train_variations.pkl"
+  val_pickle_file_path: "./data/tcga_data/split/Llama-3.3-70B-processed-200-split-variations/tcga_val_variations.pkl"
   embeddings_dim_size: 768
   max_seq_length: 1024
+  random_choice_report: true
 
 training:
   output_dir: "./pathollama_train"
   eval_strategy: "epoch"
   do_train: true
-  do_eval: false
+  do_eval: true
   save_strategy: "steps"
   save_steps: 800
   logging_steps: 10

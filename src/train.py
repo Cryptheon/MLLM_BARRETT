@@ -41,12 +41,22 @@ def main():
     logger.info("Approx. model size: %.2f MB", total_mb)
 
     train_dataset = PathoMultiModalDataset(
-        pickle_file=config["dataset"]["pickle_file_path"],
+        pickle_file=config["dataset"]["train_pickle_file_path"],
         max_seq_length=config["dataset"]["max_seq_length"],
         embeddings_dim_size=config["dataset"]["embeddings_dim_size"],
-        tokenizer=tokenizer
+        tokenizer=tokenizer,
+        random_choice_report=True
     )
-    logger.info("Training dataset loaded from %s", config["dataset"]["pickle_file_path"])
+    logger.info("Training dataset loaded from %s", config["dataset"]["train_pickle_file_path"])
+
+    val_dataset = PathoMultiModalDataset(
+        pickle_file=config["dataset"]["val_pickle_file_path"],
+        max_seq_length=config["dataset"]["max_seq_length"],
+        embeddings_dim_size=config["dataset"]["embeddings_dim_size"],
+        tokenizer=tokenizer,
+        random_choice_report=False
+    )
+    logger.info("Validation dataset loaded from %s", config["dataset"]["val_pickle_file_path"])
 
     collator = MultiModalCollator(tokenizer)
     logger.info("Data collator initialized.")
@@ -58,7 +68,7 @@ def main():
         model=model,
         args=training_args,
         train_dataset=train_dataset,
-        eval_dataset=train_dataset,
+        eval_dataset=val_dataset,
         data_collator=collator
     )
     logger.info("Trainer initialized. Starting training...")

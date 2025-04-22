@@ -41,7 +41,8 @@ class PathoMultiModalDataset(Dataset):
         pickle_file: str,
         tokenizer: PreTrainedTokenizer,
         max_seq_length: int = 1024,
-        embeddings_dim_size: int = 768
+        embeddings_dim_size: int = 768,
+        random_choice_report: bool = False
     ) -> None:
         super().__init__()
         self.tokenizer = tokenizer
@@ -49,6 +50,7 @@ class PathoMultiModalDataset(Dataset):
         # sequence (WSI embeddings + textual embeddings)
         self.max_length = max_seq_length
         self.hidden_size = embeddings_dim_size
+        self.random_choice_report = random_choice_report
 
         if not os.path.exists(pickle_file):
             raise FileNotFoundError(f"Pickle file not found: {pickle_file}")
@@ -66,7 +68,11 @@ class PathoMultiModalDataset(Dataset):
         patient = self.data[patient_id]
 
         text_variations: str = patient["reports"]
-        text: str = random.choice(text_variations)
+        if self.random_choice_report:
+            text: str = random.choice(text_variations)
+        else:
+            text = text_variations[0]
+
         wsi_embeddings = torch.tensor(np.array(patient["embeddings"]))  # List of tensors
         
         if text is None or len(wsi_embeddings)==0 :
