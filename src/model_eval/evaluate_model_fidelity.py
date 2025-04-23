@@ -30,7 +30,14 @@ def extract_and_parse_json(raw_text):
 def main():
     parser = argparse.ArgumentParser(description="Evaluate fidelity scores from raw LLM evaluation outputs.")
     parser.add_argument("--fidelity_json", type=str, required=True, help="Path to JSON with raw LLM outputs")
+    parser.add_argument("--category_weights_json", type=str, required=True, help="Path to JSON with category importance weights")
+
     args = parser.parse_args()
+
+    # Load weights
+    with open(args.category_weights_json, "r") as f:
+        weight_data = json.load(f)
+        category_weights = weight_data["categories"]
 
     with open(args.fidelity_json, "r") as f:
         raw_data = json.load(f)
@@ -75,12 +82,9 @@ def main():
     overall_avg = np.mean(all_overall_scores)
     overall_std = np.std(all_overall_scores)
 
-    print("=== Overall Fidelity Scores ===")
+    print("=== Overall Model Fidelity Scores ===")
     print(f"Average: {overall_avg:.4f}")
     print(f"Std Dev: {overall_std:.4f}\n")
-
-    print("=== Per-Case Component Score Summary ===")
-    print(df_summary.describe(include='all'))
 
     df_summary.to_csv("fidelity_summary.csv", index=False)
 
@@ -94,6 +98,21 @@ def main():
     category_stds = df_category.std()
     for cat in category_means.index:
         print(f"{cat:40s}  Mean: {category_means[cat]:.3f}  Std: {category_stds[cat]:.3f}")
+
+    # ----- Reweighted Stats -----
+    print("\n=== Reweighted Per-Category Score Stats ===")
+    weighted_sum = 0.0
+    total_weight = 0.0
+    for cat in category_means.index:
+        weight = category_weights.get(cat, 1)  # Default to 1 if missing
+        weighted_sum += category_means[cat] * weight
+        total_weight += weight
+        print(f"{cat:40s}  Weight: {weight}  Weighted Score: {category_means[cat] * weight:.3f}")
+
+    weighted_avg = weighted_sum / total_weight if total_weight > 0 else 0.0
+    
+    print("\n=== Weighted Per-Category Fidelity Scores ===")
+    print(f"Weighted Average Fidelity Score: {weighted_avg:.4f}")
 
     # Save plot
     plt.figure(figsize=(12, 6))
