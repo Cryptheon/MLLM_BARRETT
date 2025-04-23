@@ -35,8 +35,9 @@ Your evaluation should look like this:
   "case_id": "auto_generated_or_user_supplied",
   "scores": {
     "primary_diagnosis_and_grade": {
+      "notes": "Reasoning here...",
       "score": 0.0,
-      "notes": "Reasoning here..."
+      
     },
     ...
   },
@@ -55,52 +56,52 @@ Your evaluation should look like this:
   "case_id": "uterine_001",
   "scores": {
     "primary_diagnosis_and_grade": {
-      "score": 1.0,
-      "notes": "Correct diagnosis and grade preserved (FIGO grade 2 endometrioid adenocarcinoma with squamous differentiation)."
+      "notes": "Correct diagnosis and grade preserved (FIGO grade 2 endometrioid adenocarcinoma with squamous differentiation).",
+      "score": 1.0
     },
     "subtype_and_morphologic_features": {
-      "score": 0.5,
-      "notes": "Squamous differentiation mentioned, but other morphologic features (glandular architecture, nuclear pleomorphism) missing."
+      "notes": "Squamous differentiation mentioned, but other morphologic features (glandular architecture, nuclear pleomorphism) missing.",      
+      "score": 0.5
     },
     "tumor_architecture_and_cell_detail": {
-      "score": 0.0,
-      "notes": "Nuclear details and mitotic activity are not described."
+      "notes": "Nuclear details and mitotic activity are not described.",      
+      "score": 0.0
     },
     "local_invasion": {
-      "score": 0.0,
-      "notes": "Invasion depth and cervical involvement are completely misrepresented."
+      "notes": "Invasion depth and cervical involvement are completely misrepresented.",      
+      "score": 0.0
     },
     "margin_status": {
-      "score": 0.5,
-      "notes": "Resection margins are stated as uninvolved in original; generated report does not clearly mention margin status."
+      "notes": "Resection margins are stated as uninvolved in original; generated report does not clearly mention margin status.",    
+      "score": 0.5
     },
     "lymphovascular_and_perineural_invasion": {
-      "score": 0.0,
-      "notes": "Original report notes lymphovascular invasion, which is denied in the generated report."
+      "notes": "Original report notes lymphovascular invasion, which is denied in the generated report.",      
+      "score": 0.0
     },
     "lymph_node_involvement": {
-      "score": 0.0,
-      "notes": "Generated report states all nodes are benign, while original describes metastatic disease in periaortic nodes."
+      "notes": "Generated report states all nodes are benign, while original describes metastatic disease in periaortic nodes.",      
+      "score": 0.0
     },
     "metastatic_site_fidelity": {
-      "score": 0.0,
-      "notes": "Generated report denies all metastases; original reports lymph node metastasis."
+      "notes": "Generated report denies all metastases; original reports lymph node metastasis.",      
+      "score": 0.0
     },
     "focality_laterality_distribution": {
-      "score": 0.0,
-      "notes": "Left ovarian teratoma present in original but not reported in generated."
+      "notes": "Left ovarian teratoma present in original but not reported in generated.",      
+      "score": 0.0
     },
     "adjacent_structure_involvement": {
-      "score": 0.0,
-      "notes": "Cervical involvement is denied in the generated report, contradicting original."
+      "notes": "Cervical involvement is denied in the generated report, contradicting original.",
+      "score": 0.0
     },
     "specimen_completeness_or_missing_elements": {
-      "score": 1.0,
-      "notes": "Most relevant structures are referenced in some form."
+      "notes": "Most relevant structures are referenced in some form.",      
+      "score": 1.0
     },
     "background_non_neoplastic_findings": {
-      "score": 0.5,
-      "notes": "Leiomyomas reported in both, but mature cystic teratoma not reflected."
+      "notes": "Leiomyomas reported in both, but mature cystic teratoma not reflected.",      
+      "score": 0.5
     }
   },
   "overall_fidelity_score": 0.32
