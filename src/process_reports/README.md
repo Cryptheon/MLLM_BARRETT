@@ -25,11 +25,6 @@ The input CSV must contain at least the following columns:
 Date of Receipt: Clinical Diagnosis & History: Incidental 3 cm left upper pole renal mass. Specimens Submitted: 1: Kidney, Left Upper Pole; Partial Nephrectomy. DIAGNOSIS: ...
 ```
 
-**Example `text` value:**
-```
-Date of Receipt: Clinical Diagnosis & History: Incidental 3 cm left upper pole renal mass. Specimens Submitted: 1: Kidney, Left Upper Pole; Partial Nephrectomy. DIAGNOSIS: ...
-```
-
 **Running the script manually (single GPU example):**
 ```bash
 python process_reports_with_llama_cpp.py \
@@ -79,4 +74,79 @@ sbatch slurm_process_reports.job
 - `output_reports/histopathology_reports.csv`: Final merged report file.
 
 This setup is ideal for distributed processing of large datasets on a cluster with multiple GPUs.
+
+---
+
+### 3. extract_tcga_labels_with_llm.py (TCGA Label Extraction)
+
+This script extracts standardized TCGA cancer type labels from generated pathology reports using a language model.
+
+**Functionality:**
+- Loads a list of standardized TCGA labels.
+- Uses a prompt to extract the label from a generated report.
+- Normalizes and maps the extracted label to a TCGA code.
+
+**Input JSON format:**
+```json
+[
+  {
+    "patient_id": "TCGA-XX-XXXX",
+    "generated_report": "..."
+  }
+]
+```
+
+**Running the script:**
+```bash
+python extract_tcga_labels_with_llm.py \
+  --config path/to/config.yaml \
+  --prompt_path path/to/prompt.txt \
+  --input_json path/to/input.json \
+  --tcga_json path/to/tcga_labels.json \
+  --output_json path/to/output.json \
+  --gpu 0
+```
+
+**Output:**
+A JSON file with entries including the original patient ID, extracted label, and matched TCGA code.
+
+---
+
+### 4. evaluate_reports_with_llama_cpp.py (Report Evaluation)
+
+This script compares original and generated reports and scores them using a prompt-based rubric via a local LLM.
+
+**Functionality:**
+- Loads a prompt rubric.
+- Evaluates original vs. generated reports.
+- Produces one or more evaluations per report pair.
+
+**Input JSON format:**
+```json
+[
+  {
+    "patient_id": "TCGA-XX-XXXX",
+    "original_report": "...",
+    "generated_report": "..."
+  }
+]
+```
+
+**Running the script:**
+```bash
+python evaluate_reports_with_llama_cpp.py \
+  --config path/to/config.yaml \
+  --prompt_path path/to/prompt.txt \
+  --input_json path/to/input.json \
+  --output_json path/to/output.json \
+  --num_variations 1 \
+  --start_idx 0 \
+  --end_idx 20 \
+  --gpu 0
+```
+
+**Output:**
+A JSON file where each entry contains the patient ID and a list of raw evaluation outputs.
+
+This script is useful for assessing the fidelity and quality of generated pathology reports.
 

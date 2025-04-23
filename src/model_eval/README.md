@@ -60,5 +60,48 @@ Standard deviation:     0.0451
 
 ---
 
-These scripts provide an end-to-end evaluation pipeline: from generating reports using a multimodal model to quantitatively assessing their semantic similarity to ground truth reports.
+### 3. `evaluate_tcga_classification.py`
+This script evaluates the cancer type classification accuracy by comparing model-predicted labels against ground truth labels using TCGA data.
+
+#### Functionality:
+- Loads predicted labels and ground truth mappings.
+- Computes classification report and accuracy.
+- Optionally computes multiclass AUC and confusion matrix.
+
+#### Running the script:
+```sh
+python model_eval/evaluate_tcga_classification.py \
+  --predictions_json ./data/tcga_data/tcga_generated/extracted_labels/tcga_200_val.json \
+  --ground_truth_csv ./data/tcga_data/tcga_labels/tcga_patient_to_cancer_type.csv \
+  --tcga_json ./configs/tcga/tcga_labels.json
+```
+
+#### Output:
+- Classification metrics including accuracy, precision, recall, F1-score.
+- Optionally: AUC (macro) and ROC curve plots.
+
+---
+
+### 4. `evaluate_model_fidelity.py`
+This script evaluates structured fidelity scores from raw LLM output, parsing embedded JSON with detailed scoring per component.
+
+#### Functionality:
+- Parses raw model evaluation strings to extract JSON-formatted rubric scores.
+- Computes descriptive statistics on fidelity scores and their components.
+- Outputs a summary CSV and a boxplot of per-category scores.
+
+#### Running the script:
+```sh
+python evaluate_model_fidelity.py \
+  --fidelity_json ../data/tcga_data/tcga_generated/evaluated_rubric/llama_70b_eval.json
+```
+
+#### Output:
+- Console statistics on overall and per-category fidelity scores.
+- A CSV summary of per-case scores.
+- A boxplot saved as `category_scores_boxplot.png`.
+
+---
+
+These scripts provide an end-to-end evaluation pipeline: from generating reports using a multimodal model to quantitatively assessing their semantic similarity, classification accuracy, and structured fidelity against rubric-based criteria.
 
