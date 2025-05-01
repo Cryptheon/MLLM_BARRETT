@@ -128,7 +128,7 @@ def main():
     # Display input
     console.print(Panel(original_text, title=f"[bold green]Original Report: {patient_id}", box=box.DOUBLE))
 
-    generated_text = generate(model, tokenizer, wsi_embeddings, original_text)
+    generated_text = generate(model, tokenizer, wsi_embeddings, original_text, config)
 
     # Display output
     console.print(Panel(generated_text, title="[bold blue]Generated Text", box=box.DOUBLE))

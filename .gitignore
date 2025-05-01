@@ -177,3 +177,17 @@ data/tcga_data/
 
 # PyPI configuration file
 .pypirc
+
+# conch
+CONCH/
+
+
+# data and generation related
+process_reports/output_reports/
+data/tcga_data/tcga_reports/
+data/tcga_data/tcga_generated/
+data/tcga_data/split/
+data/tcga_data/pickles/
+
+# logging and models
+pathollama_train/
