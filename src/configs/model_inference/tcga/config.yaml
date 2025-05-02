@@ -15,9 +15,9 @@ dataset:
   random_choice_report: false
 
 inference:
-  model_path: "./pathollama_train/checkpoint-2560/model.safetensors"
-  temperature: 0.8
-  top_k: 64
+  model_path: "./pathollama_train/checkpoint-5120-2-layers-20-epochs/model.safetensors"
+  temperature: 0.5
+  top_k: 128
   min_p: 0.00
   top_p: 0.95
   max_new_tokens: 2048
