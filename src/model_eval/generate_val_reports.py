@@ -51,6 +51,9 @@ def generate(model, tokenizer, wsi_embeddings, config):
     input_tokens = tokenizer("", return_tensors="pt", truncation=True,
                              max_length=config["dataset"]["max_seq_length"])
     input_ids = input_tokens["input_ids"].to(model.device)
+    # patch the first BOS token to 0th index if we're using our own trained tokenizer based on Llama's
+    if config["tokenizer"]["custom_tokenizer"]:
+        input_ids[0] = 0
     wsi_embeddings = wsi_embeddings.to(model.device)
 
     with torch.no_grad():
@@ -81,7 +84,10 @@ def main():
     total_tokens = 0
     start_time = time.time()
 
-    for patient_id in dataset.patient_ids:
+    for i, patient_id in enumerate(dataset.patient_ids):
+        if (i+1)%10==0:
+            logger.info("Processing patient number %d", i)
+        
         patient_data = dataset.data[patient_id]
         text_variations = eval(patient_data["reports"])
         original_text = (random.choice(text_variations)

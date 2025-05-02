@@ -42,7 +42,8 @@ class PathoMultiModalDataset(Dataset):
         tokenizer: PreTrainedTokenizer,
         max_seq_length: int = 1024,
         embeddings_dim_size: int = 768,
-        random_choice_report: bool = False
+        random_choice_report: bool = False,
+        custom_tokenizer: bool = True
     ) -> None:
         super().__init__()
         self.tokenizer = tokenizer
@@ -51,6 +52,7 @@ class PathoMultiModalDataset(Dataset):
         self.max_length = max_seq_length
         self.hidden_size = embeddings_dim_size
         self.random_choice_report = random_choice_report
+        self.custom_tokenizer = custom_tokenizer
 
         if not os.path.exists(pickle_file):
             raise FileNotFoundError(f"Pickle file not found: {pickle_file}")
@@ -74,7 +76,7 @@ class PathoMultiModalDataset(Dataset):
         else:
             text = text_variations[0]
 
-        wsi_embeddings = torch.tensor(np.array(patient["embeddings"]))  # List of tensors
+        wsi_embeddings = torch.tensor(np.array(patient["embeddings"])) 
         
         if text is None or len(wsi_embeddings)==0 :
             # Resample if shuffling, otherwise get next sequential
@@ -95,8 +97,14 @@ class PathoMultiModalDataset(Dataset):
             padding="max_length",
             return_tensors="pt"
         )
+        #torch.set_printoptions(threshold=10_000)
 
         input_ids = tokenized["input_ids"].squeeze(0)  # remove batch dim
+        # If we trained our own tokenizer based on Llama's we need to patch the first BOS token
+        # Somehow Llama's tokenizer persists with index 128000 as starting token
+        if self.custom_tokenizer:
+            # <|begin_of_text|> token is 0th index
+            input_ids[0] = 0
 
         # We clone the labels without shifting it for CausalLM.
         # We explicitly construct the shifted labels for next token prediction in the model
