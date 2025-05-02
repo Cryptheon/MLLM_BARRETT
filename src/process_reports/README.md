@@ -97,13 +97,15 @@ This script extracts standardized TCGA cancer type labels from generated patholo
 ```
 
 **Running the script:**
+Example:
+
 ```bash
 python extract_tcga_labels_with_llm.py \
-  --config path/to/config.yaml \
-  --prompt_path path/to/prompt.txt \
-  --input_json path/to/input.json \
-  --tcga_json path/to/tcga_labels.json \
-  --output_json path/to/output.json \
+  --config ../configs/model_inference/Llama-3.3-70B-instruct-GGUF.yaml \
+  --prompt_path ../configs/prompts/extract_tcga_label_with_list.txt \
+  --input_json ../data/tcga_data/tcga_generated/generated_reports/tcga_200_2_layers_8192_vocab.json \
+  --tcga_json ../configs/tcga/tcga_labels.json \
+  --output_json ../data/tcga_data/tcga_generated/extracted_labels/tcga_200_val_2_layers_8192_vocab.json \
   --gpu 0
 ```
 
@@ -133,16 +135,16 @@ This script compares original and generated reports and scores them using a prom
 ```
 
 **Running the script:**
+Example:
+
 ```bash
-python evaluate_reports_with_llama_cpp.py \
-  --config path/to/config.yaml \
-  --prompt_path path/to/prompt.txt \
-  --input_json path/to/input.json \
-  --output_json path/to/output.json \
-  --num_variations 1 \
+python python evaluate_reports_with_llama_cpp.py \  
+  --config ../configs/model_inference/Llama-3.3-70B-instruct-GGUF.yaml \
+  --prompt_path ../configs/prompts/tcga_generated_fidelity_rubric_prompt.txt \   
+  --input_json ../data/tcga_data/tcga_generated/tcga_200_val.json \
+  --output_json ../data/tcga_data/tcga_generated/llama_70b_eval.json \
   --start_idx 0 \
-  --end_idx 20 \
-  --gpu 0
+  --end_idx 20
 ```
 
 **Output:**

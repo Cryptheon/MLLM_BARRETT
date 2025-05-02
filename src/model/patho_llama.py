@@ -13,6 +13,7 @@ class PathoLlamaModel(LlamaModel):
     config_class = PathoLlamaConfig
     def __init__(self, config: LlamaConfig):
         super().__init__(config)
+        print("Llama config", self.config)
 
 class PathoLlamaForCausalLM(LlamaForCausalLM):
     config_class = PathoLlamaConfig
@@ -22,7 +23,6 @@ class PathoLlamaForCausalLM(LlamaForCausalLM):
         self.model = PathoLlamaModel(config)
         self.pretraining_tp = getattr(config, "pretraining_tp", False)
         self.training = getattr(config, "training")
-        print("self training", self.training)
         self.vocab_size = config.vocab_size
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
         self.post_init()
@@ -49,6 +49,7 @@ class PathoLlamaForCausalLM(LlamaForCausalLM):
 
         for i in range(batch_size):
             text_ids = input_ids[i]
+            
             txt_embeds = model.embed_tokens(text_ids)
             wsi_embeds = wsi_embeddings[i]
             
@@ -71,6 +72,8 @@ class PathoLlamaForCausalLM(LlamaForCausalLM):
             new_labels_list = [x[:tokenizer_model_max_length] for x in new_labels_list]
 
         # Padding to the max sequence length
+        # This manual padding is only necessary when the input lengths differ
+        # else only the attention mask will be padded and the new labels.
         max_len = max(x.shape[0] for x in new_input_embeds_list)
         new_input_embeds_padded = []
         new_labels_padded = torch.full((batch_size, max_len), IGNORE_INDEX, dtype=new_labels_list[0].dtype, device=device)
@@ -94,6 +97,7 @@ class PathoLlamaForCausalLM(LlamaForCausalLM):
                 position_ids_padded[i, :cur_len] = torch.arange(0, cur_len, dtype=torch.long, device=device)
 
         new_input_embeds = torch.stack(new_input_embeds_padded, dim=0)
+
         # position_ids ommitted for now
         return None, None, attention_mask_padded, past_key_values, new_input_embeds, new_labels_padded
 
