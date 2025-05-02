@@ -90,6 +90,11 @@ def generate(model, tokenizer, wsi_embeddings, input_ids, config):
                              max_length=config["dataset"]["max_seq_length"])
     
     input_ids = input_tokens["input_ids"].to(model.device)
+
+    # patch the first BOS token to 0th index if we're using our own trained tokenizer based on Llama's
+    if config["tokenizer"]["custom_tokenizer"]:
+        input_ids[0] = 0
+        
     wsi_embeddings = wsi_embeddings.to(model.device)
 
     # Generate prediction

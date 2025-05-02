@@ -31,6 +31,7 @@ def main():
     # Load tokenizer and model
     tokenizer = AutoTokenizer.from_pretrained(config["tokenizer"]["tokenizer_name"])
     tokenizer.pad_token = tokenizer.eos_token
+
     logger.info("Tokenizer loaded and pad token set.")
 
     model_config = PathoLlamaConfig(**config["model"])
