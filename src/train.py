@@ -29,7 +29,7 @@ def main():
     logger.info("Full config:\n%s", yaml.dump(config, sort_keys=False))
 
     # Load tokenizer and model
-    tokenizer = AutoTokenizer.from_pretrained(config["model"]["core_model_name"])
+    tokenizer = AutoTokenizer.from_pretrained(config["tokenizer"]["tokenizer_name"])
     tokenizer.pad_token = tokenizer.eos_token
     logger.info("Tokenizer loaded and pad token set.")
 
