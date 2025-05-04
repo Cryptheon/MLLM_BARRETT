@@ -1,9 +1,13 @@
+import logging
 import torch
 from torch import Tensor
 from transformers import LlamaConfig, LlamaForCausalLM, LlamaModel
 import torch.nn as nn
 
 IGNORE_INDEX = -100
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 class PathoLlamaConfig(LlamaConfig):
     model_type = "patho_llama"
@@ -13,7 +17,7 @@ class PathoLlamaModel(LlamaModel):
     config_class = PathoLlamaConfig
     def __init__(self, config: LlamaConfig):
         super().__init__(config)
-        print("Llama config", self.config)
+        logger.debug(f"Initialized PathoLlamaModel with config: {config}")
 
 class PathoLlamaForCausalLM(LlamaForCausalLM):
     config_class = PathoLlamaConfig

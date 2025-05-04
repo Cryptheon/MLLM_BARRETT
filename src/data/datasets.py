@@ -161,9 +161,9 @@ class PubMedTextDataset(Dataset):
         
         self.json_path: Path = Path(json_path)
         self.tokenizer: PreTrainedTokenizer = tokenizer
-        self.max_length: int = max_seq_length # max_length now refers to token length
+        self.max_length: int = max_seq_length 
         self.num_data_points: Optional[int] = num_data_points
-        self.shuffle: bool = shuffle_on_init # Store shuffle setting for resampling logic
+        self.shuffle: bool = shuffle_on_init
         self.custom_tokenizer: bool = custom_tokenizer
 
         self.data: List[Dict[str, Any]] = self._load_data()
@@ -239,7 +239,6 @@ class PubMedTextDataset(Dataset):
         
         title = item.get("abstract_title", "")
         abstract = item.get("abstract_text", "")
-        
   
         text = abstract.strip()
 
@@ -273,7 +272,6 @@ class PubMedTextDataset(Dataset):
 
         input_ids = tokenized["input_ids"].squeeze(0)
 
-        # Example: Patching the first token if using a specific custom Llama tokenizer
         if self.custom_tokenizer:
             # Assuming 0 is the index for <|begin_of_text|> or equivalent BOS
             if input_ids.numel() > 0: # Check if tensor is not empty
