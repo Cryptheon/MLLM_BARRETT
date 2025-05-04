@@ -1,0 +1,69 @@
+histopathology
+histopathological
+histological
+histology
+tissue section
+tissue slide
+pathology report
+whole slide image
+whole slide imaging
+WSI
+digital pathology
+virtual microscopy
+slide scanner
+slide scanning
+microscopic pathology
+tissue diagnosis
+tissue morphology
+pathological tissue
+hematoxylin and eosin
+H&E
+immunohistochemistry
+IHC
+digitized slide
+scanned slide
+computational pathology
+deep learning pathology
+deep learning histopathology
+machine learning histopathology
+CNN histopathology
+convolutional neural network histopathology
+transformer histopathology
+segmentation histopathology
+classification histopathology
+patch-based histopathology
+tile-based histopathology
+feature extraction histopathology
+image analysis pathology
+histopathological grading
+histopathological classification
+histopathological segmentation
+nuclear segmentation
+gland segmentation
+tissue classification
+ROI histopathology
+region of interest histopathology
+tumor microenvironment histopathology
+tissue architecture
+digital slide
+high-resolution pathology
+WSI analysis
+tile extraction pathology
+slide-level prediction
+patch-level prediction
+annotation pathology
+annotated slide
+diagnostic histopathology
+morphological features pathology
+epithelial tissue pathology
+glandular tissue pathology
+neoplastic tissue pathology
+biopsy slide
+histopathology image
+histopathology slide
+pathology staining
+H&E stained
+IHC stained
+digitized pathology
+slide tiling
+
