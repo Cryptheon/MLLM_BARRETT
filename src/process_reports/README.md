@@ -138,13 +138,13 @@ This script compares original and generated reports and scores them using a prom
 Example:
 
 ```bash
-python python evaluate_reports_with_llama_cpp.py \  
-  --config ../configs/model_inference/Llama-3.3-70B-instruct-GGUF.yaml \
-  --prompt_path ../configs/prompts/tcga_generated_fidelity_rubric_prompt.txt \   
-  --input_json ../data/tcga_data/tcga_generated/tcga_200_val.json \
-  --output_json ../data/tcga_data/tcga_generated/llama_70b_eval.json \
-  --start_idx 0 \
-  --end_idx 20
+python evaluate_reports_with_llama_cpp.py \
+--config ../configs/model_inference/Llama-3.3-70B-instruct-GGUF.yaml \
+--prompt_path ../configs/prompts/tcga_generated_fidelity_rubric_prompt.txt \
+--input_json ../data/tcga_data/tcga_generated/generated_reports/tcga_200_2_layers_8192_vocab.json \
+--output_json ../data/tcga_data/tcga_generated/llama_70b_eval_8192_vocab.json \
+--start_idx 0 \
+--end_idx 200
 ```
 
 **Output:**
