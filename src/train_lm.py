@@ -1,12 +1,11 @@
 import argparse
 import yaml
 import logging
-import os 
 from utils.util_functions import print_model_size 
 from transformers import (
     AutoTokenizer,
     TrainingArguments,
-    Trainer, # Use standard Trainer
+    Trainer,
     DataCollatorForLanguageModeling # Use standard data collator for LM
 )
 
@@ -31,13 +30,12 @@ def main():
                         help='Path to the text pretraining config YAML file')
     args = parser.parse_args()
 
-    # --- Configuration Loading ---
     config = load_config(args.config)
     logger.info("Configuration loaded from %s", args.config)
     logger.info("Full config:\n%s", yaml.dump(config, default_flow_style=False, sort_keys=False))
 
-    tokenizer_config = config.get("tokenizer", {})
-    tokenizer_name = tokenizer_config.get("tokenizer_name")
+    tokenizer_config = config["tokenizer"]
+    tokenizer_name = tokenizer_config["tokenizer_name"]
     if not tokenizer_name:
         raise ValueError("Tokenizer name ('tokenizer_name') not specified in config.")
         
@@ -49,7 +47,7 @@ def main():
     
     logger.info("Tokenizer '%s' loaded.", tokenizer_name)
 
-    model_params = config.get("model")
+    model_params = config["model"]
     # Decide whether to load from pretrained or initialize from config
     pretrained_path = model_params.pop("pretrained_model_name_or_path", None) 
     
@@ -68,11 +66,10 @@ def main():
     logger.info("Total parameters: %s", f"{total_params:,}")
     logger.info("Approx. model size: %.2f MB", total_mb)
 
-    # --- Datasets ---
-    dataset_config = config.get("dataset", {})
-    train_json_path = dataset_config.get("train_json_path")
+    dataset_config = config["dataset"]
+    train_json_path = dataset_config["train_json_path"]
   
-    max_seq_length = dataset_config.get("max_seq_length")
+    max_seq_length = dataset_config["max_seq_length"]
 
     if not max_seq_length:
          raise ValueError("max_seq_length not specified in dataset config.")
@@ -83,12 +80,11 @@ def main():
         tokenizer=tokenizer,
         max_seq_length=max_seq_length,
         shuffle_on_init=True, # Shuffle training data when loaded
+        custom_tokenizer=config["tokenizer"]["custom_tokenizer"]
         # num_data_points can be added here if specified in config
     )
     logger.info("Training dataset loaded from %s (%d samples)", train_json_path, len(train_dataset))
 
-
-    # --- Data Collator ---
     # For Causal LM pretraining (predicting the next token), mlm=False.
     collator = DataCollatorForLanguageModeling(
         tokenizer=tokenizer, 
@@ -96,8 +92,8 @@ def main():
     )
     logger.info("Data collator for Causal LM initialized (mlm=False).")
 
-    training_params = config.get("training", {})
-    if not training_params.get("output_dir"):
+    training_params = config["training"]
+    if not training_params["output_dir"]:
          raise ValueError("output_dir must be specified in training config.")
          
     training_args = TrainingArguments(**training_params)
@@ -111,7 +107,6 @@ def main():
         model=model,
         args=training_args,
         train_dataset=train_dataset,
-        eval_dataset=val_dataset,
         data_collator=collator,
         tokenizer=tokenizer # Pass tokenizer for saving purposes
     )
@@ -127,7 +122,6 @@ def main():
          
     logger.info("Pretraining complete.")
 
-    # --- Save Final Model ---
     logger.info(f"Saving final model to {training_args.output_dir}")
     trainer.save_model() 
     trainer.save_state()
