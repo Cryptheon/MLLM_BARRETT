@@ -1,4 +1,6 @@
 import logging
+from pathlib import Path
+from safetensors.torch import load_file as load_safetensors
 import torch
 from torch import Tensor
 from transformers import LlamaConfig, LlamaForCausalLM, LlamaModel
@@ -29,8 +31,39 @@ class PathoLlamaForCausalLM(LlamaForCausalLM):
         self.training = getattr(config, "training")
         self.vocab_size = config.vocab_size
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
+
+        # Load weights conditionally *after* architecture is built
+        checkpoint_path_str = getattr(config, 'load_checkpoint_path', None)
+
+        if checkpoint_path_str:
+            self.load_text_model(checkpoint_path_str)
+        else:
+            logger.info("No 'load_checkpoint_path' provided in config. Initializing model without loading checkpoint weights.")
         self.post_init()
 
+    def load_text_model(self, checkpoint_path_str: str) -> None:
+        
+        logger.info(f"Attempting to load weights from TextLlama checkpoint: {checkpoint_path_str}")
+        checkpoint_path = Path(checkpoint_path_str)
+        
+        # Determine weight file path (prefer safetensors)
+        safetensors_path = checkpoint_path / "model.safetensors"
+        loaded_state_dict = load_safetensors(str(safetensors_path), device="cpu")
+                
+        # Load into the current model (self)
+        # Using strict=True because architectures are assumed identical
+        missing_keys, unexpected_keys = self.load_state_dict(loaded_state_dict, strict=True) 
+                
+        if missing_keys:
+                logger.warning(f"Weights loaded, but some keys were missing in checkpoint: {missing_keys}")
+        if unexpected_keys:
+                logger.warning(f"Weights loaded, but some extra keys were found in checkpoint: {unexpected_keys}")
+                
+        if not missing_keys and not unexpected_keys:
+                logger.info(f"Successfully loaded all weights from checkpoint: {checkpoint_path}")
+        else:
+                logger.warning(f"Issues encountered loading weights from {checkpoint_path}. Check warnings above.")
+        
     def get_model(self) -> PathoLlamaModel:
         return self.model
 

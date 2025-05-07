@@ -1,9 +1,9 @@
 tokenizer:
-  tokenizer_name: "./tokenizers/trained_tokenizers/"
+  tokenizer_name: "./tokenizers/trained_tokenizers/32768_pubmed/"
   custom_tokenizer: true
 model:
   model_path: "meta-llama/Meta-Llama-3-8B"
-  vocab_size: 8192
+  vocab_size: 32768
   hidden_size: 768
   num_hidden_layers: 2
   num_attention_heads: 2
@@ -16,12 +16,12 @@ dataset:
   random_choice_report: false
 
 inference:
-  model_path: "./pathollama_train/checkpoint-3200-2-layers-8192-vocab/model.safetensors"
+  model_path: "./pathollama_train/checkpoint-9000-32768-pretrained-303k-high-lr/model.safetensors"
   temperature: 0.5
   top_k: 128
   min_p: 0.00
   top_p: 0.95
   max_new_tokens: 1024
-  do_sample: true
+  do_sample: false
 
 
