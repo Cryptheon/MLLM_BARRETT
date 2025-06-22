@@ -6,6 +6,8 @@ model:
   num_hidden_layers: 2
   num_attention_heads: 2
   max_position_embeddings: 1024
+  cross_attn: true
+  cross_attn_layer_index: 1
   
 tokenizer:
   tokenizer_name: "./tokenizers/trained_tokenizers/32768_pubmed/"
@@ -25,15 +27,15 @@ training:
   do_train: true
   do_eval: true
   save_strategy: "steps"
-  save_steps: 3000
+  save_steps: 2500
   logging_steps: 10
   lr_scheduler_type: "linear"
   logging_strategy: "steps"
   #logging_dir: "./runs"
   per_device_train_batch_size: 32
   per_device_eval_batch_size: 1
-  num_train_epochs: 100
-  learning_rate: 0.001
+  num_train_epochs: 20
+  learning_rate: 0.0006
   dataloader_num_workers: 12
   fp16: false
   bf16: true
