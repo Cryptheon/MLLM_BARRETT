@@ -102,10 +102,10 @@ def generate(model, tokenizer, wsi_embeddings, input_ids, config):
     with torch.no_grad():
         generated = model.generate(
             inputs=input_ids,
+            attention_mask=input_tokens["attention_mask"],
             wsi_embeddings=wsi_embeddings,
             max_new_tokens=config["inference"]["max_new_tokens"],
             do_sample=config["inference"]["do_sample"],
-            #top_p=config["inference"]["top_p"],
             temperature=config["inference"]["temperature"],
             stop_strings="<|end_of_text|>",
             eos_token_id=tokenizer.eos_token_id,

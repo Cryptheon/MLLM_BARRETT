@@ -31,6 +31,7 @@ def load_model_tokenizer(config):
     model.training = False
     state_dict = load_file(config["inference"]["model_path"])
     model.load_state_dict(state_dict)
+    logger.info("Loaded the WSI Pathology MLLM")
     model.eval()
     model.to("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -59,6 +60,7 @@ def generate(model, tokenizer, wsi_embeddings, config):
     with torch.no_grad():
         generated = model.generate(
             inputs=input_ids,
+            attention_mask=input_tokens["attention_mask"],
             wsi_embeddings=wsi_embeddings,
             max_new_tokens=config["inference"]["max_new_tokens"],
             do_sample=config["inference"]["do_sample"],
