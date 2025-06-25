@@ -6,7 +6,7 @@ def load_requirements(path: str) -> list:
         return [line.strip() for line in f if line.strip() and not line.startswith("#")]
 
 setup(
-    name="patho_llama",
+    name="patho_llama_barrett",
     version="0.1.0",
     author="Bryan Cardenas",
     description="A multimodal extension of LLaMA for pathology tasks",

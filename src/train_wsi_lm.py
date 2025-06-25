@@ -5,7 +5,7 @@ from utils.util_functions import print_model_size
 from transformers import AutoTokenizer, TrainingArguments
 from model.patho_llama import PathoLlamaForCausalLM, PathoLlamaConfig
 from data.datasets import PathoMultiModalDataset
-from multimodal_trainer import MultiModalTrainer
+from trainer.multimodal_trainer import MultiModalTrainer
 from data.collator import MultiModalCollator
 
 # Set up logging

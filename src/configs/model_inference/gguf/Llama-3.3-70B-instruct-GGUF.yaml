@@ -1,4 +1,4 @@
-model_path: "../../../hf_models/Llama-3.3-70B-Instruct-GGUF/Llama-3.3-70B-Instruct-Q4_K_M.gguf"
+model_path: "../../models/hf_models/Llama-3.3-70B-Instruct-GGUF/Llama-3.3-70B-Instruct-Q4_K_M.gguf"
 max_seq_length: 128000
 max_new_tokens: 4096
 seed: None

@@ -1,5 +1,6 @@
 torch
 transformers
+huggingface-hub
 accelerate
 bitsandbytes
 numpy
@@ -8,12 +9,15 @@ typing_extensions
 scipy
 scikit-learn
 scikit-image
+imageio
+humanize
+h5py
 safetensors
 pandas
 h5py
 PyYAML
 tensorboard
-wandb
-llama-cpp-python
+ninja
 rich
 seaborn
+llama-cpp-python

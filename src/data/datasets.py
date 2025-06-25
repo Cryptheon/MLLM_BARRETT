@@ -1,6 +1,7 @@
 import os
 import pickle
 import json
+import h5py
 from pathlib import Path
 from typing import List, Dict, Tuple, Any, Optional, Union
 import random
@@ -42,6 +43,150 @@ class DummyMultiModalDataset(Dataset):
             "wsi_embeddings": wsi_embeddings
         }
         
+
+class MultiModalBarrett(Dataset):
+    """
+    A PyTorch dataset for multimodal pathology data, loading text from a JSON
+    file and all WSI embeddings from a single, combined HDF5 file.
+    """
+    def __init__(
+        self,
+        json_file: str,
+        embeddings_file: str, 
+        tokenizer: PreTrainedTokenizer,
+        max_seq_length: int = 1024,
+        random_choice_report: bool = False,
+        custom_tokenizer: bool = True,
+        phase: str = "train",
+        val_data_ratio: float = 0.2
+    ) -> None:
+        """
+        Initializes the dataset.
+
+        Args:
+            json_file (str): Path to the JSON file with text reports.
+            embeddings_file (str): Path to the single combined HDF5 file.
+            tokenizer (PreTrainedTokenizer): The tokenizer for text processing.
+            max_seq_length (int): The maximum sequence length for tokenized text.
+            random_choice_report (bool): If True, randomly selects one of the
+                                         translated reports. Otherwise, uses the first.
+            custom_tokenizer (bool): Flag to handle special tokens for a custom tokenizer.
+        """
+        super().__init__()
+        self.tokenizer = tokenizer
+        self.max_length = max_seq_length
+        self.random_choice_report = random_choice_report
+        self.custom_tokenizer = custom_tokenizer
+        self.embeddings_file = embeddings_file
+
+        # Validate file paths
+        if not os.path.exists(json_file):
+            raise FileNotFoundError(f"JSON file not found: {json_file}")
+        if not os.path.exists(embeddings_file):
+            raise FileNotFoundError(f"Embeddings HDF5 file not found: {embeddings_file}")
+
+        # Load and process data
+        self.samples = self._load_and_pair_data(json_file, embeddings_file)
+        self.samples.sort()
+
+        if phase=="train":
+            self.samples = self.samples[:int(len(self.samples)*(1-val_data_ratio))]
+
+        elif phase=="val":
+            self.samples = self.samples[-int(len(self.samples)*val_data_ratio):]
+
+        if not self.samples:
+            logger.warning("No valid data samples were found after processing.")
+
+    def _load_and_pair_data(self, json_file: str, embeddings_file: str) -> List[Dict[str, Any]]:
+        """Loads data from JSON and pairs it with keys from the combined HDF5 file."""
+        logger.info(f"Loading JSON data from {json_file}")
+        with open(json_file, 'r', encoding='utf-8') as f:
+            text_data = json.load(f)
+
+        logger.info(f"Scanning keys from combined HDF5 file: {embeddings_file}")
+        with h5py.File(embeddings_file, 'r') as hf:
+            embedding_keys = list(hf.keys())
+        
+        paired_samples = []
+        for case in text_data:
+            an_number = case.get("original_case", {}).get("An_Number")
+            if not an_number:
+                logger.warning("Skipping case due to missing 'An_Number'.")
+                continue
+
+            # Find all matching embedding keys for the An_Number
+            matching_keys = [key for key in embedding_keys if key.startswith(an_number)]
+            
+            if not matching_keys:
+                logger.warning(f"No embedding keys found for An_Number: {an_number}")
+                continue
+
+            for key in matching_keys:
+                paired_samples.append({
+                    "case_data": case,
+                    "embedding_key": key # Store the key instead of a path
+                })
+        
+        logger.info(f"Successfully paired {len(paired_samples)} text-embedding samples.")
+        return paired_samples
+
+    def __len__(self) -> int:
+        """Returns the total number of paired samples."""
+        return len(self.samples)
+
+    def __getitem__(self, idx: int) -> Dict[str, Any]:
+        """
+        Retrieves a single paired sample of text and WSI embeddings.
+        Opens the H5 file here to be compatible with multi-worker DataLoader.
+        """
+        sample = self.samples[idx]
+        case_data = sample["case_data"]
+        embedding_key = sample["embedding_key"]
+
+        # 1. Process Text (same as before)
+        translated_reports = case_data.get("translated_reports", [])
+        if not translated_reports:
+            return self.__getitem__(random.randint(0, len(self) - 1))
+        
+        report = random.choice(translated_reports) if self.random_choice_report else translated_reports[0]
+        text_parts = [report.get(k, "") for k in ["KlinischeGegevens", "Macroscopie", "Microscopie", "Conclusie", "Diagnose"]]
+        text = "\n".join(filter(None, text_parts))
+
+        if not text:
+            return self.__getitem__(random.randint(0, len(self) - 1))
+
+        tokenized = self.tokenizer(text=text, truncation=True, max_length=self.max_length, padding="max_length", return_tensors="pt")
+        input_ids = tokenized["input_ids"].squeeze(0)
+
+        if self.custom_tokenizer and input_ids.numel() > 0:
+            input_ids[0] = 0
+
+        labels = input_ids.clone()
+
+        # 2. Load WSI Embeddings from the single H5 file
+        try:
+            with h5py.File(self.embeddings_file, 'r') as hf:
+                # Access the group using the key, then the 'features' dataset
+                wsi_embeddings = torch.tensor(hf[embedding_key]['features'][:], dtype=torch.float32)
+        except Exception as e:
+            logger.error(f"Failed to load embeddings for key '{embedding_key}': {e}. Resampling.")
+            return self.__getitem__(random.randint(0, len(self) - 1))
+
+        if wsi_embeddings.shape[0] == 0:
+            logger.warning(f"Empty embeddings for key '{embedding_key}'. Resampling.")
+            return self.__getitem__(random.randint(0, len(self) - 1))
+
+        if wsi_embeddings.shape[0] > self.max_length:
+            wsi_embeddings = wsi_embeddings[:self.max_length]
+
+        return {
+            "input_ids": input_ids,
+            "labels": labels,
+            "wsi_embeddings": wsi_embeddings,
+            "case_id": case_data.get("original_case", {}).get("An_Number")
+        }
+
 class PathoMultiModalDataset(Dataset):
     def __init__(
         self,
