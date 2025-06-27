@@ -1,0 +1,23 @@
+# Specify the engine to use the API backend
+engine: "openai"
+
+# --- API Connection Details ---
+# The base URL of your OpenAI-compatible server.
+# For a local server (like llama-cpp-python's server), this is often http://localhost:8000/v1
+api_base: "http://your-api-server-url:8000/v1"
+
+# The API key for your service. For many local servers, this can be any string.
+api_key: "your-api-key-here"
+
+# The model identifier that the API server uses.
+# This must match a model loaded on your server.
+model_id: "your-model-name-on-the-server"
+
+
+# --- Generation Parameters ---
+# These are copied from your previous configuration.
+temperature: 0.6
+top_p: 0.95
+
+# The 'max_new_tokens' from your old config is now 'max_tokens' for the OpenAI API.
+max_tokens: 4096
