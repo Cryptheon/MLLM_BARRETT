@@ -4,8 +4,8 @@ import logging
 import random
 import torch
 from transformers import AutoTokenizer
-from model.patho_llama import PathoLlamaForCausalLM, PathoLlamaConfig
-from data.datasets import PathoMultiModalDataset
+from model.patho_llama import PathoLlamaForCausalLM, PathoLlamaConfig 
+from data.datasets import MultiModalBarrett
 from utils.util_functions import print_model_size
 from safetensors.torch import load_file
 from rich.console import Console
@@ -19,7 +19,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 console = Console()
-
 
 def load_config(path: str) -> dict:
     with open(path, 'r') as file:
@@ -36,7 +35,7 @@ def load_model_tokenizer(config):
     model = PathoLlamaForCausalLM(model_config)
     model.training = False
     state_dict = load_file(config["inference"]["model_path"])
-    model.load_state_dict(state_dict)#, map_location="cuda"), weights_only=False)
+    model.load_state_dict(state_dict)
     model.eval()
     model.to("cuda" if torch.cuda.is_available() else "cpu")
     logger.info("Model loaded from %s", config["inference"]["model_path"])
@@ -48,53 +47,85 @@ def load_model_tokenizer(config):
     return model, tokenizer
 
 def load_data(config, tokenizer):
-    # Load dataset
-    dataset = PathoMultiModalDataset(
-        pickle_file=config["dataset"]["val_pickle_file_path"],
-        max_seq_length=config["dataset"]["max_seq_length"],
-        embeddings_dim_size=config["dataset"]["embeddings_dim_size"],
-        tokenizer=tokenizer,
-        random_choice_report=config["dataset"]["random_choice_report"]
-
-    )
-    logger.info("Dataset loaded from %s", config["dataset"]["val_pickle_file_path"])
+    # Load dataset using MultiModalBarrett
+    dataset =  MultiModalBarrett(json_file=config["dataset"]["train_texts_json_path"], # Using val path for inference
+                                      embeddings_file=config["dataset"]["train_h5_file_path"], # Using val path for inference
+                                      tokenizer=tokenizer,
+                                      phase="val",
+                                      val_data_ratio=config["dataset"]["val_data_ratio"],
+                                      max_seq_length=config["dataset"]["max_seq_length"],
+                                      random_choice_report=config["dataset"]["random_choice_report"])
+    
+    # Corrected log message
+    logger.info("Validation dataset loaded from JSON and HDF5 files.")
 
     return dataset
 
 def get_data(config, tokenizer, dataset, args):
-    
-    if args.patient and args.patient in dataset.patient_ids:
-        patient_id = args.patient
-    else:
-        patient_id = random.choice(dataset.patient_ids)
-        logger.info("Randomly sampled patient ID: %s", patient_id)
+    """
+    Selects a sample from the MultiModalBarrett dataset, retrieves the processed
+    WSI embeddings and the corresponding original text.
+    """
+    idx = -1
+    # If a specific patient is requested, search for its index in the dataset
+    if args.patient:
+        try:
+            # The patient ID is stored as 'An_Number' in the case data
+            idx = next(i for i, sample in enumerate(dataset.samples) 
+                       if sample['case_data'].get('original_case', {}).get('An_Number') == args.patient)
+            logger.info(f"Found patient ID '{args.patient}' at index {idx}.")
+        except StopIteration:
+            logger.warning(f"Patient ID '{args.patient}' not found. A random sample will be used instead.")
+            # idx remains -1, triggering random selection
 
-    patient_data = dataset.data[patient_id]
-    text_variations = patient_data["reports"]
-    text_variations = eval(text_variations)
-    if config["dataset"]["random_choice_report"]:
-        original_text: str = random.choice(text_variations)
-    else:
-        original_text = text_variations[0]
+    # If no patient was specified or found, pick a random sample
+    if idx == -1:
+        idx = random.randint(0, len(dataset) - 1)
+        logger.info(f"Randomly selected sample at index: {idx}")
+
+    # Use the dataset's __getitem__ to get the processed tensors
+    processed_sample = dataset[idx]
+    wsi_embeddings = processed_sample["wsi_embeddings"]
+    patient_id = processed_sample["case_id"]
+
+    # For display purposes, we need to reconstruct the original text.
+    # We access the raw sample from the .samples list to get the text data.
+    raw_sample = dataset.samples[idx]
+    case_data = raw_sample["case_data"]
+    print(case_data)
+    translated_reports = case_data.get("cleaned_reports", [])
     
-    wsi_embeddings = torch.tensor(patient_data["embeddings"]).unsqueeze(0)  # Add batch dimension
+    # Use the same logic as __getitem__ to select a report
+    if config["dataset"]["random_choice_report"] and len(translated_reports) > 1:
+        report = random.choice(translated_reports)
+    else:
+        report = translated_reports[0]
+    
+    text_parts = [report.get(k, "") for k in ["Microscopie", "Conclusie", "Diagnose"]]
+    original_text = "\n".join(filter(None, text_parts))
+
+    # Add the batch dimension required for model inference
+    wsi_embeddings = wsi_embeddings.unsqueeze(0)
+    print("embeddings shape", wsi_embeddings.shape)
 
     return wsi_embeddings, original_text, patient_id
 
-def generate(model, tokenizer, wsi_embeddings, input_ids, config):
 
-    # Tokenize prompt
-    input_tokens = tokenizer("", 
-                             return_tensors="pt", 
-                             truncation=True, 
-                             max_length=config["dataset"]["max_seq_length"])
+def generate(model, tokenizer, wsi_embeddings, config):
+    # Your original script passed `original_text` here but named it `input_ids`
+    # and then immediately overwrote it. This version is cleaner.
     
+    # We start generation from an empty prompt, as the context comes from WSI embeddings
+    input_tokens = tokenizer("", return_tensors="pt")
     input_ids = input_tokens["input_ids"].to(model.device)
 
-    # patch the first BOS token to 0th index if we're using our own trained tokenizer based on Llama's
+    # Patch the first BOS token to 0th index if using a custom tokenizer
     if config["tokenizer"]["custom_tokenizer"]:
-        input_ids[0] = 0
-        
+        if input_ids.shape[1] > 0:
+            input_ids[0, 0] = 0 # BOS token
+        else: # Handle empty input case
+            input_ids = torch.tensor([[0]], device=model.device)
+
     wsi_embeddings = wsi_embeddings.to(model.device)
 
     # Generate prediction
@@ -105,7 +136,6 @@ def generate(model, tokenizer, wsi_embeddings, input_ids, config):
             wsi_embeddings=wsi_embeddings,
             max_new_tokens=config["inference"]["max_new_tokens"],
             do_sample=config["inference"]["do_sample"],
-            #top_p=config["inference"]["top_p"],
             temperature=config["inference"]["temperature"],
             stop_strings="<|end_of_text|>",
             eos_token_id=tokenizer.eos_token_id,
@@ -116,29 +146,26 @@ def generate(model, tokenizer, wsi_embeddings, input_ids, config):
 
 def main():
     parser = argparse.ArgumentParser(description="Run inference on PathoLlama model with multimodal data")
-    parser.add_argument('--config', type=str, default="./configs/tcga/config.yaml", help='Path to config YAML file')
+    parser.add_argument('--config', type=str, default="./configs/barrett/config.yaml", help='Path to config YAML file')
     parser.add_argument('--patient', type=str, default=None, help='Patient ID to use (optional, will sample if not provided)')
     args = parser.parse_args()
 
     config = load_config(args.config)
     logger.info("Configuration loaded from %s", args.config)
-    logger.info("Full config:\n%s", yaml.dump(config, sort_keys=False))
+    
+    console.print(Panel(yaml.dump(config, sort_keys=False), title="[bold yellow]Configuration", expand=False))
 
     model, tokenizer = load_model_tokenizer(config)
-
     dataset = load_data(config, tokenizer)
-
     wsi_embeddings, original_text, patient_id = get_data(config, tokenizer, dataset, args)
 
     # Display input
     console.print(Panel(original_text, title=f"[bold green]Original Report: {patient_id}", box=box.DOUBLE))
 
-    generated_text = generate(model, tokenizer, wsi_embeddings, original_text, config)
+    generated_text = generate(model, tokenizer, wsi_embeddings, config)
 
     # Display output
     console.print(Panel(generated_text, title="[bold blue]Generated Text", box=box.DOUBLE))
 
-
 if __name__ == "__main__":
     main()
-

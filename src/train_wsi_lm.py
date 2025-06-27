@@ -4,7 +4,7 @@ import logging
 from utils.util_functions import print_model_size
 from transformers import AutoTokenizer, TrainingArguments
 from model.patho_llama import PathoLlamaForCausalLM, PathoLlamaConfig
-from data.datasets import PathoMultiModalDataset
+from data.datasets import MultiModalBarrett
 from trainer.multimodal_trainer import MultiModalTrainer
 from data.collator import MultiModalCollator
 
@@ -41,24 +41,27 @@ def main():
     logger.info("Total parameters: %s", f"{total_params:,}")
     logger.info("Approx. model size: %.2f MB", total_mb)
 
-    train_dataset = PathoMultiModalDataset(
-        pickle_file=config["dataset"]["train_pickle_file_path"],
-        max_seq_length=config["dataset"]["max_seq_length"],
-        embeddings_dim_size=config["dataset"]["embeddings_dim_size"],
-        tokenizer=tokenizer,
-        random_choice_report=True
-    )
-    logger.info("Training dataset loaded from %s", config["dataset"]["train_pickle_file_path"])
+    data_config = config["dataset"]
 
-    val_dataset = PathoMultiModalDataset(
-        pickle_file=config["dataset"]["val_pickle_file_path"],
-        max_seq_length=config["dataset"]["max_seq_length"],
-        embeddings_dim_size=config["dataset"]["embeddings_dim_size"],
-        tokenizer=tokenizer,
-        random_choice_report=False
-    )
-    logger.info("Validation dataset loaded from %s", config["dataset"]["val_pickle_file_path"])
+    train_dataset = MultiModalBarrett(json_file=data_config["train_texts_json_path"],
+                                      embeddings_file=data_config["train_h5_file_path"], 
+                                      tokenizer=tokenizer,
+                                      phase="train",
+                                      val_data_ratio=data_config["val_data_ratio"],
+                                      max_seq_length=data_config["max_seq_length"],
+                                      random_choice_report=data_config["random_choice_report"])
 
+    logger.info("Text Training dataset loaded from %s", data_config["train_texts_json_path"])
+    logger.info("WSI embeddings Training dataset loaded from %s", data_config["train_h5_file_path"])
+
+    val_dataset = MultiModalBarrett(json_file=data_config["train_texts_json_path"],
+                                      embeddings_file=data_config["train_h5_file_path"], 
+                                      tokenizer=tokenizer,
+                                      phase="val",
+                                      val_data_ratio=data_config["val_data_ratio"],
+                                      max_seq_length=data_config["max_seq_length"],
+                                      random_choice_report=data_config["random_choice_report"])
+    
     collator = MultiModalCollator(tokenizer)
     logger.info("Data collator initialized.")
 

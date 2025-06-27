@@ -86,7 +86,6 @@ class PathoLlamaForCausalLM(LlamaForCausalLM):
 
         for i in range(batch_size):
             text_ids = input_ids[i]
-            
             txt_embeds = model.embed_tokens(text_ids)
             wsi_embeds = wsi_embeddings[i]
             
