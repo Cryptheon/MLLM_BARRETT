@@ -38,7 +38,7 @@ class PathoLlamaForCausalLM(LlamaForCausalLM):
         if checkpoint_path_str:
             self.load_text_model(checkpoint_path_str)
         else:
-            logger.info("No 'load_checkpoint_path' provided in config. Initializing model without loading checkpoint weights.")
+            logger.info("No pretrained base model from 'load_checkpoint_path' provided in config. Initializing model without loading pretrained checkpoint weights.")
         self.post_init()
 
     def load_text_model(self, checkpoint_path_str: str) -> None:
@@ -217,7 +217,7 @@ class PathoLlamaForCausalLM(LlamaForCausalLM):
                                 attention_mask=attention_mask,
                                 use_cache=True,
                                 inputs_embeds=inputs_embeds, 
-                                input_ids=inputs, 
+                                input_ids=None, #inputs
                                 **kwargs)
     
     # @torch.no_grad()
