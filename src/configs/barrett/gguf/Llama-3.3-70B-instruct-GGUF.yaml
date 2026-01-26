@@ -1,0 +1,16 @@
+# Add this line to select the local Llama-cpp engine
+engine: "llama_cpp" 
+
+# The rest of your parameters
+model_path: "../../models/hf_models/Llama-3.3-70B-Instruct-GGUF/Llama-3.3-70B-Instruct-Q4_K_M.gguf"
+type: "llama"
+max_seq_length: 128000
+max_new_tokens: 4096
+seed: 42
+temperature: 0.0
+top_k: 256
+min_p: 0.00
+top_p: 0.95
+n_gpu_layers: 81
+chat_format: "llama-3"
+repetition_penalty: 1.0

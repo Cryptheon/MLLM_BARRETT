@@ -43,21 +43,189 @@ class DummyMultiModalDataset(Dataset):
             "wsi_embeddings": wsi_embeddings
         }
         
+class MultiModalBarrettSingleSlide(Dataset):
+    """
+    A PyTorch dataset for multimodal pathology data, loading text and a single
+    WSI embedding per sample. Each sample corresponds to a specific slide (e.g.,
+    identified by a Roman numeral) from a case, based on the 'divided_reports'
+    field in the JSON file.
+    """
+    def __init__(
+        self,
+        json_file: str,
+        embeddings_file: str,
+        tokenizer: PreTrainedTokenizer,
+        max_seq_length: int = 1024,
+        phase: str = "train",
+        val_data_ratio: float = 0.2,
+        allowed_labels: List[str] = ["HGD", "LGD", "ND"],
+    ) -> None:
+        """
+        Initializes the dataset.
 
-import os
-import json
-import random
-import logging
-from typing import Any, Dict, List
+        Args:
+            json_file (str): Path to the JSON file with text reports.
+            embeddings_file (str): Path to the single combined HDF5 file.
+            tokenizer (PreTrainedTokenizer): The tokenizer for text processing.
+            max_seq_length (int): The maximum sequence length for tokenized text.
+            phase (str): Specifies the dataset phase ('train' or 'val').
+            val_data_ratio (float): The proportion of data to be used for validation.
+        """
+        super().__init__()
+        self.tokenizer = tokenizer
+        self.max_length = max_seq_length
+        self.custom_tokenizer = True
+        self.embeddings_file = embeddings_file
 
-import h5py
-import torch
-from torch.utils.data import Dataset
-from transformers import PreTrainedTokenizer
+        # Validate file paths
+        if not os.path.exists(json_file):
+            raise FileNotFoundError(f"JSON file not found: {json_file}")
+        if not os.path.exists(embeddings_file):
+            raise FileNotFoundError(f"Embeddings HDF5 file not found: {embeddings_file}")
 
-# Setup basic logger
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+        # Load and process data into a flat list of single-slide samples
+        self.samples = self._load_and_pair_data(json_file, embeddings_file)
+        # Sort by the unique sample ID (e.g., 'RL-0012-I') for reproducibility
+        self.samples.sort(key=lambda x: x["embedding_key"])
+
+        # Split data into training and validation sets
+        if phase == "train":
+            self.samples = self.samples[:int(len(self.samples) * (1 - val_data_ratio))]
+        elif phase == "val":
+            self.samples = self.samples[-int(len(self.samples) * val_data_ratio):]
+
+        if not self.samples:
+            logger.warning("No valid data samples were found after processing.")
+
+        self.allowed_labels = allowed_labels
+        
+        # English keys are used directly from the `divided_reports` structure
+        self.text_sections = ["Microscopie", "Conclusie", "barrett_label"]
+
+        logging.info(f"Loaded {len(self.samples)} single-slide samples for phase: {phase}.")
+
+    def _load_and_pair_data(self, json_file: str, embeddings_file: str) -> List[Dict[str, Any]]:
+        """
+        Loads data from JSON and creates a flat list of one-to-one samples.
+        It handles HDF5 keys with suffixes (e.g., '-HE', '_1') by matching
+        any key that starts with the base identifier (e.g., 'RL-0012-I').
+        """
+        logger.info(f"Loading JSON data from {json_file}")
+        with open(json_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            text_data = list(data.values()) if isinstance(data, dict) else data
+
+        logger.info(f"Scanning keys from combined HDF5 file: {embeddings_file}")
+        with h5py.File(embeddings_file, 'r') as hf:
+            embedding_keys_set = set(hf.keys())
+
+        paired_samples = []
+        for case in text_data:
+            an_number = case.get("original_case", {}).get("An_Number")
+
+            divided_reports = case.get("divided_reports")
+
+            if not isinstance(divided_reports, dict):
+                logger.warning(f"An_Number: {an_number} is not a valid dictionary.")
+                continue
+
+            if not an_number or not divided_reports:
+                logger.warning(f"Skipping case due to missing 'An_Number' or 'divided_reports'.")
+                continue
+
+            sub_report_keys = divided_reports.get("barrett_label", {}).keys()
+            if not sub_report_keys:
+                logger.warning(f"No sub-reports found for An_Number: {an_number}")
+                continue
+
+            for roman_numeral in sub_report_keys:
+                # Create the base prefix to search for (e.g., "RL-0012-I")
+                base_key_prefix = f"{an_number}-{roman_numeral}"
+
+                # --- START OF FIX ---
+                # Find all keys in the HDF5 file that start with this prefix
+                matching_full_keys = [key for key in embedding_keys_set if key.startswith(base_key_prefix)]
+
+                if not matching_full_keys:
+                    logger.warning(f"No embedding key starting with '{base_key_prefix}' found. Skipping.")
+                    continue
+
+                # Create a distinct sample for each matching embedding file (e.g., -HE, -HE_1)
+                for full_key in matching_full_keys:
+                    paired_samples.append({
+                        "case_data": case,
+                        "roman_numeral": roman_numeral,
+                        "embedding_key": full_key  # Store the complete, correct key
+                    })
+                # --- END OF FIX ---
+
+        logger.info(f"Successfully created {len(paired_samples)} single-slide samples.")
+        return paired_samples
+
+    def __len__(self) -> int:
+        """Returns the total number of single-slide samples."""
+        return len(self.samples)
+
+    def __getitem__(self, idx: int) -> Dict[str, Any]:
+        """
+        Retrieves a single sample, consisting of one sub-report and its
+        corresponding WSI embedding tensor.
+        """
+        sample = self.samples[idx]
+        case_data = sample["case_data"]
+        roman_numeral = sample["roman_numeral"]
+        embedding_key = sample["embedding_key"]
+
+        # 1. Process Text from the 'divided_reports' section
+        divided_reports = case_data.get("divided_reports", {})
+        
+        barrett_label = divided_reports.get("barrett_label", {}).get(roman_numeral)
+        if not barrett_label or barrett_label not in self.allowed_labels:
+            #logger.warning(f"Invalid or missing label for {embedding_key}. Resampling.")
+            return self.__getitem__(random.randint(0, len(self) - 1))
+
+        # Build text from the specific sub-report
+        text_parts = []
+        for section in self.text_sections:
+             # a cleaner way to get keys from the divided_reports section
+            section_key = section.lower().replace(" ", "")
+            text_content = divided_reports.get(section, {}).get(roman_numeral, "")
+            text_parts.append(f"{section_key}: {text_content}")
+
+        text = "\n\n".join(filter(None, text_parts))
+
+        if not text.strip():
+            #logger.warning(f"Case {embedding_key} has empty text fields. Resampling.")
+            return self.__getitem__(random.randint(0, len(self) - 1))
+
+        tokenized = self.tokenizer(text=text, truncation=True, max_length=self.max_length, padding="max_length", return_tensors="pt")
+        input_ids = tokenized["input_ids"].squeeze(0)
+
+        if self.custom_tokenizer:
+             # Or whatever specific token ID needs patching
+            input_ids[0] = 0
+
+        labels = input_ids.clone()
+
+        # 2. Load the specific WSI Embedding from the HDF5 file
+        try:
+            with h5py.File(self.embeddings_file, 'r') as hf:
+                wsi_embeddings = torch.tensor(hf[embedding_key]['features'][:], dtype=torch.float32)
+                if wsi_embeddings.shape[0] == 0:
+                    #logger.warning(f"Empty embeddings for key '{embedding_key}'. Resampling.")
+                    return self.__getitem__(random.randint(0, len(self) - 1))
+        except (IOError, KeyError) as e:
+            #logger.error(f"Could not load embedding for key '{embedding_key}': {e}. Resampling.")
+            return self.__getitem__(random.randint(0, len(self) - 1))        
+
+        wsi_embeddings = wsi_embeddings.unsqueeze(0)
+        return {
+            "input_ids": input_ids,
+            "labels": labels,
+            "wsi_embeddings": wsi_embeddings,
+            "case_id": embedding_key,  # Use the unique key as the ID
+            "barrett_label": barrett_label
+        }
 
 class MultiModalBarrett(Dataset):
     """
@@ -71,7 +239,6 @@ class MultiModalBarrett(Dataset):
         embeddings_file: str,
         tokenizer: PreTrainedTokenizer,
         max_seq_length: int = 1024,
-        random_choice_report: bool = False,
         phase: str = "train",
         val_data_ratio: float = 0.2
     ) -> None:
@@ -91,7 +258,6 @@ class MultiModalBarrett(Dataset):
         super().__init__()
         self.tokenizer = tokenizer
         self.max_length = max_seq_length
-        self.random_choice_report = random_choice_report
         # The 'custom_tokenizer' flag was present but not used in the original __init__ args.
         # Assuming its logic is tied to the tokenizer type.
         self.custom_tokenizer = True #"llama" in tokenizer.name_or_path.lower()
@@ -115,6 +281,17 @@ class MultiModalBarrett(Dataset):
 
         if not self.samples:
             logger.warning("No valid data samples were found after processing.")
+
+        self.allowed_labels = ["HGD", "LGD", "ND"] #,"IND", "C"]
+
+        self.nl_to_eng_sections = {"Microscopie": "microscopy", 
+                          "Conclusie": "conclusion", 
+                          "barrett_label": "barrett_label", 
+                          "KlinischeVraagstelling": "clinicalQuery",
+                          "KlinischeGegevens": "clinicalData",
+                          "An_Number": "an_number",
+                          "Diagnose": "diagnosis",
+                          "report": "report"}
 
         logging.info(f"Loaded {len(self.samples)} samples for phase: {phase}.")
 
@@ -169,16 +346,22 @@ class MultiModalBarrett(Dataset):
         case_data = sample["case_data"]
         # MODIFICATION: Get the list of embedding keys.
         embedding_keys = sample["embedding_keys"]
-
+       
         # 1. Process Text
-        translated_reports = case_data.get("cleaned_reports", [])
-        if not translated_reports:
-            logger.warning("Case has no 'translated_reports'. Resampling.")
+        report = case_data.get("tcga_structured", [])
+        if not report or isinstance(report, str):
+            logger.warning(f"Case {case_data.get('An_Number')}, has no 'cleaned_reports'. Resampling.")
             return self.__getitem__(random.randint(0, len(self) - 1))
 
-        report = random.choice(translated_reports) if self.random_choice_report else translated_reports[0]
-        text_parts = [report.get(k, "") for k in ["Microscopie", "Conclusie", "Diagnose"]]
-        text = "\n".join(filter(None, text_parts))
+        #barret_label = case_data.get("cleaned_reports").get("barrett_label")
+        #if barret_label and not any([barret_label==label for label in self.allowed_labels]):
+        #    return self.__getitem__(random.randint(0, len(self) - 1))
+
+        #text_parts = [k+": "+"\'" + report.get(k, "") + "\'" for k in ["Microscopie", "Conclusie", "Diagnose"]]# ["Microscopie", "Conclusie", "Diagnose"]]
+        #text_parts = [f"{self.nl_to_eng_sections[k]}: " + report.get(k, "") for k in ["Microscopie", "Conclusie"]]
+        #print(f"report: {report}")
+        text_parts = [f"{self.nl_to_eng_sections[k]}: " + report.get(k, "") for k in ["report"]]
+        text = "\n\n".join(filter(None, text_parts))
 
         if not text.strip():
             logger.warning("Case has empty text fields after processing. Resampling.")
@@ -197,7 +380,6 @@ class MultiModalBarrett(Dataset):
         # We explicitly construct the shifted labels for next token prediction in the model
         # The dataset should return the cloned input ids only for flexiblity.
         labels = input_ids.clone()
-
         # 2. Load all WSI Embeddings from the single H5 file
         # MODIFICATION: Iterate through the list of keys and load each embedding.
         wsi_embeddings_list = []
@@ -225,12 +407,13 @@ class MultiModalBarrett(Dataset):
             return self.__getitem__(random.randint(0, len(self) - 1))
 
         wsi_embeddings = torch.vstack(wsi_embeddings_list)
-
+        
         return {
             "input_ids": input_ids,
             "labels": labels,
             "wsi_embeddings": wsi_embeddings,
-            "case_id": case_data.get("original_case", {}).get("An_Number")
+            "case_id": case_data.get("original_case", {}).get("An_Number"),
+            #"barrett_label": barret_label
         }
 
 

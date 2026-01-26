@@ -1,0 +1,30 @@
+experiment:
+  name: "Barrett_Classification_Hybrid"
+  seed: 42
+
+data:
+  json_file: "../../data/processed/json/cleaned/qwen_235b_divided_1.json"
+  embeddings_file: "../../data/processed/titan_combined_slide_features/titan_slide_features_conch_v15_revision_24_10_25.h5"
+  # "ND" vs "LGD" vs "HGD". IND is skipped.
+  classes_to_use: ["ND", "LGD", "HGD"] 
+  val_ratio: 0.133 
+
+model:
+  # TOGGLE THIS: 
+  # True = Train MLP on individual slides (uses divided_reports)
+  # False = Train MIL on bags of slides (uses cleaned_reports)
+  use_single_instance_learning: true 
+  
+  input_dim: 768       
+  hidden_dim: 512      
+  dropout: 0.25
+  gated: true          # Only relevant if use_single_instance_learning is False
+
+training:
+  epochs: 30
+  batch_size: 32       # Can increase batch size for MLP/Single Instance
+  grad_accumulation_steps: 1 
+  learning_rate: 0.0006
+  weight_decay: 0.0001
+  output_dir: "./output/barrett_hybrid_training"
+  save_plot: true

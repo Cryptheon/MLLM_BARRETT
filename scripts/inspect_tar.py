@@ -85,7 +85,7 @@ def inspect_tar_file(tar_path):
 if __name__ == "__main__":
     # --- USAGE EXAMPLE ---
     # Run this script from your terminal like this:
-    # python your_script_name.py --tar_path LMM/RL-0006.tar
+    # python inspect_tar.py --tar_path LMM/RL-0006.tar
     
     # To use this script, you will need to install the 'humanize' and 'Pillow' libraries:
     # pip install humanize Pillow

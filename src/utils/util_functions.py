@@ -1,11 +1,14 @@
 import yaml
 from types import SimpleNamespace
 import torch
+import logging
 from collections import OrderedDict
 
 from transformers import (
     AutoModelForCausalLM
 )
+
+logger = logging.getLogger(__name__)
 
 def move_optimizer_to_device(optimizer: torch.optim.AdamW, device: torch.device) -> None:
     """Move optimizer states to the specified device."""
@@ -66,3 +69,64 @@ def load_config(config_path: str):
         config_dict = yaml.safe_load(file)
     print(config_dict)  # Check loaded values
     return SimpleNamespace(**config_dict)
+    
+def freeze_model_layers(model: torch.nn.Module, freeze_config: dict) -> None:
+    """
+    Selectively freezes/unfreezes model layers based on a config dictionary.
+
+    Args:
+        model (torch.nn.Module): The model to modify.
+        freeze_config (dict): Configuration dictionary.
+            Example:
+            {
+                "freeze_all": true,
+                "layers_to_unfreeze": [
+                    "model.layers.31",  # Unfreezes the 32nd layer
+                    "lm_head"
+                ]
+            }
+    """
+    if not freeze_config:
+        logger.info("No freeze_config provided. All model parameters will be trainable.")
+        return
+
+    if freeze_config.get("freeze_all", False):
+        logger.info("Freezing all model parameters by default.")
+        for param in model.parameters():
+            param.requires_grad = False
+    else:
+        logger.info("freeze_all is not set to True. Starting with all parameters trainable.")
+
+    layers_to_unfreeze = freeze_config.get("layers_to_unfreeze", [])
+    
+    if freeze_config.get("freeze_all", False) and not layers_to_unfreeze:
+        logger.warning("freeze_all=True but no layers_to_unfreeze specified. Model will not train.")
+        return
+
+    unfrozen_modules = []
+    for layer_name in layers_to_unfreeze:
+        try:
+            module_to_unfreeze = model
+            parts = layer_name.split('.')
+            for part in parts:
+                if part.isdigit():
+                    # This handles list access, e.g., model.layers[1]
+                    module_to_unfreeze = module_to_unfreeze[int(part)]
+                else:
+                    # This handles attribute access, e.g., model.layers or model.lm_head
+                    module_to_unfreeze = getattr(module_to_unfreeze, part)
+            
+            # Unfreeze all parameters in the found module
+            for param in module_to_unfreeze.parameters():
+                param.requires_grad = True
+            
+            unfrozen_modules.append(layer_name)
+            logger.info(f"Unfreezing parameters for module: {layer_name}")
+
+        except (AttributeError, IndexError, TypeError) as e:
+            logger.error(f"Error accessing module '{layer_name}': {e}. This module will not be unfrozen.")
+    
+    if unfrozen_modules:
+        logger.info(f"Successfully unfroze parameters for: {', '.join(unfrozen_modules)}")
+    elif freeze_config.get("freeze_all", False):
+            logger.warning("No layers were successfully unfrozen.")

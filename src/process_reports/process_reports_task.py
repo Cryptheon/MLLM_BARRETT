@@ -2,57 +2,56 @@ import json
 import argparse
 import time
 import os
-from typing import Dict, Any, List, Callable, Tuple
+from typing import Dict, Any, List, Callable
+import functools
 
-# We still use the same powerful, unchanged ModelProcessor
 from process_reports.llm_processor import ModelProcessor
 # Assuming load_config exists in utils
 from utils.util_functions import load_config
 
-# --- Data Handler Functions ---
-# These functions define the unique logic for each pipeline step.
+def get_nested_value(data: Dict[str, Any], path: str) -> Any:
+    """
+    Retrieves a value from a nested dict using a dot-separated path.
+    Example: get_nested_value(case, 'cleaned_reports.0.Diagnose')
+    """
+    try:
+        return functools.reduce(
+            lambda d, key: d[int(key)] if key.isdigit() and isinstance(d, list) else d.get(key),
+            path.split('.'),
+            data
+        )
+    except (KeyError, TypeError, IndexError):
+        return None
 
-def extract_for_translation(case_item: Dict[str, Any]) -> Dict[str, Any]:
-    """Extractor for the 'translate' task."""
-    return case_item.get('case', {})
+def set_nested_value(data: Dict[str, Any], path: str, value: Any):
+    """
+    Sets a value in a nested dict using a dot-separated path.
+    Example: set_nested_value(case, 'cleaned_reports.0.barrett_label', ['LGD'])
+    """
+    if "." in path:
+        keys = path.split('.')
+        parent = get_nested_value(data, '.'.join(keys[:-1]))
 
-def format_for_translation(original_item: Dict[str, Any], model_output: List[Dict]) -> Dict[str, Any]:
-    """Formatter for the 'translate' task."""
-    return {
-        "original_case": original_item.get('case', {}),
-        "translated_reports": model_output
-    }
+        final_key = keys[-1]
+        parent[final_key] = value
 
-def extract_for_cleaning(case_item: Dict[str, Any]) -> Dict[str, Any]:
-    """Extractor for the 'clean' task."""
-    # Takes the first report from the 'translated_reports' list
-    if 'translated_reports' in case_item and case_item['translated_reports']:
-        return case_item['translated_reports'][0]
-    return {} # Return empty dict if not found, to be skipped later
-
-def format_for_cleaning(original_item: Dict[str, Any], model_output: List[Dict]) -> Dict[str, Any]:
-    """Formatter for the 'clean' task."""
-    return {
-        "original_case": original_item.get('original_case', {}),
-        "translated_reports": original_item.get('translated_reports', []),
-        "cleaned_reports": model_output # Use a new key for the cleaned output
-    }
-
-# --- Main Processing Logic ---
-
-def format_case_to_json_string(case_data: Dict[str, Any]) -> str:
-    """Serializes a case dictionary into a JSON-formatted string."""
-    return json.dumps(case_data, indent=4, ensure_ascii=False)
+    else:
+        data[path] = value
 
 def main():
-    # A dictionary mapping task names to their specific data handler functions
-    TASK_HANDLERS = {
-        "translate": (extract_for_translation, format_for_translation),
-        "clean": (extract_for_cleaning, format_for_cleaning)
-    }
+    parser = argparse.ArgumentParser(description="Run a generic, modular step in the pathology report processing pipeline.")
+    parser.add_argument("--task", type=str, required=True, help="A descriptive name for the task being performed (e.g., 'label', 'evaluate').")
 
-    parser = argparse.ArgumentParser(description="Run a modular step in the pathology report processing pipeline.")
-    parser.add_argument("--task", type=str, required=True, choices=TASK_HANDLERS.keys(), help="The processing task to perform ('translate' or 'clean').")
+    parser.add_argument(
+        "--input_key",
+        type=str,
+        required=True,
+        nargs='+',
+        help="One or more keys in the input JSON to be processed. Use dot-notation for nested fields. If multiple keys are provided, their values will be concatenated with a newline."
+    )
+
+    parser.add_argument("--output_key", type=str, required=True, help="The new key to add to the JSON where the output will be stored. Use dot-notation for nested fields (e.g., 'cleaned_reports.0.barrett_label').")
+
     parser.add_argument("--config", type=str, required=True, help="Path to the model config file.")
     parser.add_argument("--prompt_path", type=str, required=True, help="Path to the file containing the base prompt for this task.")
     parser.add_argument("--input_json", type=str, required=True, help="Path to the input JSON file.")
@@ -62,20 +61,18 @@ def main():
     parser.add_argument("--start_idx", type=int, default=0, help="Starting index of cases to process.")
     parser.add_argument("--end_idx", type=int, default=None, help="Ending index of cases to process (exclusive).")
     parser.add_argument("--gpu", type=int, default=0, help="GPU device ID to use.")
+    parser.add_argument('--parse_out_thinking', action='store_true', default=False, required=False)
 
     args = parser.parse_args()
     config = load_config(args.config)
+    print(config)
 
-    # Select the correct data handlers based on the --task argument
-    extractor_func, formatter_func = TASK_HANDLERS[args.task]
-
-    print(f"Running task '{args.task}' on GPU {args.gpu}")
+    # Note: args.input_key is now a list of strings
+    print(f"Running task '{args.task}' on GPU {args.gpu}: processing '{' + '.join(args.input_key)}' -> '{args.output_key}'")
     os.environ["LLAMA_VISIBLE_DEVICES"] = str(args.gpu)
 
-    # Initialize the processor
     processor = ModelProcessor(config=config, prompt_path=args.prompt_path)
 
-    # Load the input data
     with open(args.input_json, 'r', encoding='utf-8') as f:
         all_cases = json.load(f)
 
@@ -84,54 +81,76 @@ def main():
     end_idx = args.end_idx if args.end_idx is not None else len(all_cases)
     cases_to_process = all_cases[args.start_idx:end_idx]
 
-    out_path = args.output_json.replace(".json", f"_gpu{args.gpu}.json")
-    all_results = []
+    #out_path = args.output_json.replace(".json", f"_{args.task}_gpu{args.gpu}.json")
+    out_path = args.output_json
+    # TODO
+    # Check if the output file already exists to append results
+    # if os.path.exists(out_path):
+    #     with open(out_path, 'r', encoding='utf-8') as f:
+    #         all_results = json.load(f)
+    # else:
     
-    # Resume logic
-    if os.path.exists(out_path):
-        try:
-            with open(out_path, 'r', encoding='utf-8') as f:
-                all_results = json.load(f)
-            print(f"Resuming. Loaded {len(all_results)} existing results from {out_path}")
-        except json.JSONDecodeError:
-            print(f"Warning: Could not parse existing output file. Starting over.")
-            all_results = []
+    all_results = []
 
     start_time_total = time.time()
 
-    for i in range(0, len(cases_to_process), args.batch_size):
+    for i in range(len(all_results), len(cases_to_process), args.batch_size):
         batch_slice = cases_to_process[i:i + args.batch_size]
         current_batch_index = args.start_idx + i
         print(f"Processing batch starting at index {current_batch_index}/{end_idx}")
 
-        json_texts_to_process = []
-        valid_cases_in_batch = []
+        cases_in_batch = []
         for case_item in batch_slice:
-            # Use the selected extractor function
-            report_to_process = extractor_func(case_item)
-            if report_to_process: # Ensure we don't process empty objects
-                json_texts_to_process.append(format_case_to_json_string(report_to_process))
-                valid_cases_in_batch.append(case_item)
-            else:
-                print(f"Warning: Skipping item at index {i} as it could not be processed by the '{args.task}' extractor.")
-        
-        if not json_texts_to_process:
-            print("No valid cases to process in this batch. Skipping.")
-            continue
 
-        # Process the batch using the same robust processor
+            # 1. Retrieve the value for each input key provided
+            values_to_combine = []
+            for key_path in args.input_key:
+                value = get_nested_value(case_item, key_path)
+                if value: # Ensure value is not None or empty
+                    values_to_combine.append(str(value).strip())
+
+            # 2. Join the found values with a newnewline
+            if values_to_combine:
+                report_to_process = "\n\n".join(values_to_combine)
+                cases_in_batch.append(report_to_process)
+            else:
+                # This case happens if none of the provided keys were found
+                print(f"Warning: None of the input keys {args.input_key} found in case at index {args.start_idx + i + len(cases_in_batch)}. Skipping.")
+                cases_in_batch.append("")
+
         batch_results = processor.process_batch(
-            json_texts=json_texts_to_process,
+            texts=cases_in_batch,
             num_variations=args.num_variations
         )
-        print(batch_results)
 
-        # Structure and store results using the selected formatter function
-        for original_case_item, model_output in zip(valid_cases_in_batch, batch_results):
-            result_entry = formatter_func(original_case_item, model_output)
+        print(batch_results)
+        
+        # This logic seems to handle single-item batches that might be nested in an extra list
+        if len(batch_results) == 1 and args.batch_size == 1 and isinstance(batch_results[0], list):
+             batch_results = batch_results[0]
+        
+        if args.parse_out_thinking:
+            batch_results = [batch_results[0].split("<think>\n\n</think>\n\n")[1]]
+
+        for original_case_item, model_output in zip(batch_slice, batch_results):
+            result_entry = original_case_item.copy()
+            
+            # --- FIX STARTS HERE ---
+            # The model is likely returning a JSON-formatted string. We parse it into a
+            # Python dictionary so it gets saved as a proper JSON object.
+            parsed_output = model_output
+            try:
+                # Attempt to parse the string into a Python object (dict or list)
+                parsed_output = json.loads(model_output)
+            except (json.JSONDecodeError, TypeError):
+                # If parsing fails (e.g., it's not a valid JSON string or not a string at all),
+                # print a warning and store the raw output.
+                print(f"Warning: Could not parse model output as JSON. Storing as raw output.")
+            # --- FIX ENDS HERE ---
+
+            set_nested_value(result_entry, args.output_key, parsed_output)
             all_results.append(result_entry)
 
-        # Save results to the output file after each batch
         with open(out_path, 'w', encoding='utf-8') as f:
             json.dump(all_results, f, ensure_ascii=False, indent=4)
         print(f"Saved {len(all_results)} total results to {out_path}")

@@ -1,0 +1,32 @@
+tokenizer:
+  tokenizer_name: "./tokenizers/trained_tokenizers/32768_pubmed/"
+  custom_tokenizer: true
+model:
+  model_path: "meta-llama/Meta-Llama-3-8B"
+  vocab_size: 32768
+  hidden_size: 768
+  num_hidden_layers: 1
+  num_attention_heads: 1
+  max_position_embeddings: 320
+  
+
+dataset:
+  train_h5_file_path: "../../data/processed/titan_combined_slide_features/titan_slide_features_conch_v15_revision_24_10_25.h5"
+  train_texts_json_path: "../../data/processed/json/cleaned/qwen_235b_tcga_structured_barrett.json"
+  val_data_ratio: 0.133
+  embeddings_dim_size: 768
+  max_seq_length: 320
+  random_choice_report: false
+
+inference:
+  model_path: "./pretrained_tcga_models/checkpoint-9000/model.safetensors"
+  temperature: 0.4
+  top_k: 50
+  min_p: 0.00
+  top_p: 1.0
+  max_new_tokens: 320
+  repetition_penalty: 1.05
+  exponential_decay_length_penalty: null #[20, 0.05]
+  do_sample: false
+
+

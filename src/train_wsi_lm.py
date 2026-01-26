@@ -1,12 +1,13 @@
 import argparse
 import yaml
 import logging
-from utils.util_functions import print_model_size
+from utils.util_functions import print_model_size, freeze_model_layers
 from transformers import AutoTokenizer, TrainingArguments
 from model.patho_llama import PathoLlamaForCausalLM, PathoLlamaConfig
-from data.datasets import MultiModalBarrett
+from data.datasets import MultiModalBarrett, MultiModalBarrettSingleSlide
 from trainer.multimodal_trainer import MultiModalTrainer
 from data.collator import MultiModalCollator
+
 
 # Set up logging
 logging.basicConfig(
@@ -36,6 +37,14 @@ def main():
 
     model_config = PathoLlamaConfig(**config["model"])
     model = PathoLlamaForCausalLM(model_config)
+    
+    # Apply freezing logic based on config
+    if "freeze_config" in config["model"]: # Check within model config
+        logger.info("Applying model freezing configuration...")
+        freeze_model_layers(model, config["model"]["freeze_config"])
+    else:
+        logger.info("No 'freeze_config' found in model config. All model parameters will be trainable.")
+    
     trainable_params, total_params, total_mb = print_model_size(model)
     logger.info("Trainable parameters: %s", f"{trainable_params:,}")
     logger.info("Total parameters: %s", f"{total_params:,}")
@@ -48,8 +57,7 @@ def main():
                                       tokenizer=tokenizer,
                                       phase="train",
                                       val_data_ratio=data_config["val_data_ratio"],
-                                      max_seq_length=data_config["max_seq_length"],
-                                      random_choice_report=data_config["random_choice_report"])
+                                      max_seq_length=data_config["max_seq_length"])
 
     logger.info("Text Training dataset loaded from %s", data_config["train_texts_json_path"])
     logger.info("WSI embeddings Training dataset loaded from %s", data_config["train_h5_file_path"])
@@ -59,8 +67,7 @@ def main():
                                       tokenizer=tokenizer,
                                       phase="val",
                                       val_data_ratio=data_config["val_data_ratio"],
-                                      max_seq_length=data_config["max_seq_length"],
-                                      random_choice_report=data_config["random_choice_report"])
+                                      max_seq_length=data_config["max_seq_length"])
     
     collator = MultiModalCollator(tokenizer)
     logger.info("Data collator initialized.")
