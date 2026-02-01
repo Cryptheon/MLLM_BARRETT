@@ -134,12 +134,20 @@ def main():
     # ==========================================
     # 5. Evaluate/Plot
     # ==========================================
+    # 5a. Evaluate Clinical Schemas
     run_command([
         "python", "-m", "src.model_eval.evaluate_clinical_schemas",
         "--input_json", str(processing_json),
         "--output_dir", str(output_dir),
         "--label_source", "keys"
     ], "Evaluate Schemas")
+
+    # 5b. Evaluate Judge Outputs (Added to complete the pipeline)
+    run_command([
+        "python", "-m", "src.model_eval.evaluate_judge_outputs",
+        "--input_json", str(processing_json),
+        "--output_dir", str(output_dir)
+    ], "Evaluate Judge Results")
     
     print(f"Pipeline finished for {checkpoint_name}")
 
