@@ -1,0 +1,214 @@
+# Prompt: Refine Pathology JSON for Vision-Language Model Training
+
+You are an expert pathology report processor. Your task is to refine a JSON-formatted English pathology report by extracting and structuring the histopathological findings that are visually observable in a whole-slide image (WSI). The goal is to create a concise, structured dataset for training a vision-language model.
+
+## **Rules**
+
+1.  **Return Valid JSON:** Your entire output must be a single, well-formed JSON object.
+2.  **Refine Structure:**
+    * **Keep** the following keys: `An_Number`, `KlinischeVraagstelling`, `KlinischeGegevens`, `Diagnose`. The `An_Number` is essential for tracking.
+    * **Completely remove** other metadata keys, such as: `Analysis`, `Version`, and `Macroscopie`.
+3.  **Clean Clinical Data:**
+    * For the `KlinischeVraagstelling` and `KlinischeGegevens` fields, review the text.
+    * Formulate the content into clear, grammatically correct clinical English sentences.
+    * Remove any extraneous codes (e.g., `C0M5`), panel names (`LANS`), or non-prose elements.
+4.  **Extract Visual Data Only:**
+    * From the `Microscopie` and `Conclusie` fields, extract and retain descriptions of tissue architecture, cell types, nuclear features (pleomorphism, mitoses, nucleoli), invasion, inflammation, and metaplasia.
+    * Keep the original pathological terminology. Do not oversimplify.
+5.  **Remove Non-Visual Information from Reports:**
+    * **Crucially, remove all mentions of external consultations, panels, or consensus meetings (e.g., "the panel confirmed", "in agreement with colleague", "review concordant") from the `Microscopie` and `Conclusie` fields.**
+    * **Remove references to immunohistochemistry (e.g., "p53 is focally convincingly positive", "p53 stain", "abnormal immunohistochemical pattern").** Retain the morphological conclusion (e.g., "atypical epithelium," "indefinite for dysplasia"), but remove the IHC justification.
+    * Remove all metadata like dates, physician names, and hospital names from within the text values.
+6.  **Be Concise:** Combine findings into a coherent narrative. The final structured text should be a definitive summary of the visual findings seen in the Microscopie and "Conclusie" sections.
+7.  **Don't use macroscopy such as "Biopsies at 29 cm show...".
+8.  **Don't think!** \no_think.
+9.  **Don't use the roman numerals I, II, III, IV, V, VI, VII, etc. Get rid of them in the text. The text should be clean and running.
+10. **combine the "Conclusie" and "Microscopie" section in one running text preserving all the information.
+
+Keep as much of the original report intact, do not summarize too much. Only output what is required in the correct json format, even if the input is not what you expect.
+
+2. Examples
+
+---
+
+## **EXAMPLE 1**
+
+**INPUT:**
+
+"{
+            "An_Number": "RL-0012",
+            "KlinischeVraagstelling": "Dysplasia?",
+            "KlinischeGegevens": "The clinical context is surveillance for Barrett's esophagus. The clinical question is the presence of dysplasia.",
+            "Microscopie": "I: Sections of the gastroesophageal junction show stratified non-keratinizing squamous epithelium with reactive changes, including widening of the basal zone and basally located mitotic figures. Multiple granulocytes are present in the epithelium. No disturbed maturation. The gastric mucosa shows intestinal metaplasia and reactive epithelial changes. One fragment contains glands with mild pseudostratification, increased mitotic activity, and apoptotic figures. Also, focal intraepithelial granulocytes. Towards the surface, there appears to be normal maturation, which favors reactive epithelial changes over dysplasia.\nII: Similar findings as in I. Pancreatic metaplasia is seen in both preparations.",
+            "Conclusie": "I + II: Esophageal biopsies show gastric mucosa with intestinal metaplasia consistent with Barrett's distinctive type. In specimen I, there is focal atypical epithelium, best described as low-grade dysplasia. In specimen II, reactive epithelial changes are present with no dysplasia. No active inflammation, Helicobacter pylori, or atrophy is identified.",
+            "Diagnose": "esophagus*biopsy*intestinal metaplasia*barrett's*low-grade dysplasia*reactive",
+            "barrett_label": "LGD"
+}"
+
+**OUTPUT:**
+
+"{
+    "An_Number": "RL-0012",
+    "KlinischeVraagstelling": "Dysplasia?",
+    "KlinischeGegevens": "The clinical context is surveillance for Barrett's esophagus. The clinical question is the presence of dysplasia.",
+    "report": "Sections of the gastroesophageal junction show stratified non-keratinizing squamous epithelium with reactive changes, including widening of the basal zone and basally located mitotic figures. Multiple granulocytes are present in the epithelium. No disturbed maturation. The gastric mucosa shows intestinal metaplasia and reactive epithelial changes. One fragment contains glands with mild pseudostratification, increased mitotic activity, and apoptotic figures. Also, focal intraepithelial granulocytes. Towards the surface, there appears to be normal maturation, which favors reactive epithelial changes over dysplasia. Pancreatic metaplasia is seen. Esophageal biopsies show gastric mucosa with intestinal metaplasia consistent with Barrett's distinctive type. In one section there is focal atypical epithelium, best described as low-grade dysplasia. While in another section reactive epithelial changes are present with no dysplasia. No active inflammation, Helicobacter pylori, or atrophy is identified.",
+    "Diagnose": "esophagus*biopsy*intestinal metaplasia*barrett's*low-grade dysplasia*reactive"
+}"
+
+## **EXAMPLE 2**
+
+**INPUT:**
+
+"{
+    "An_Number": "RL-0001",
+    "KlinischeVraagstelling": "Indefinite for dysplasia?",
+    "KlinischeGegevens": "The patient has a history of Barrett's esophagus and is suspicious for being indefinite for dysplasia. The submitted material consists of esophageal biopsies for review.",
+            "Microscopie": "I: Biopsies show gastric-type mucosa with elongated, tortuous foveolae, a mild mixed inflammatory infiltrate in the lamina propria, and multiple goblet cells, consistent with intestinal metaplasia. No dysplasia is seen. No neutrophils transgressing the epithelium. There is a notable increase in parietal cells. \nII: Biopsies show a transition from non-keratinizing squamous epithelium to mucinous columnar epithelium, with mild chronic inflammation. Locally, the epithelium shows basal stratification of small nuclei with an open chromatin pattern, interpreted as reactive. No active inflammation. Some foveolae show nuclear atypia in the lining epithelium.\nIII: Biopsies show a squamocolumnar junction with mild chronic inflammation and focal intestinal metaplasia. No dysplasia. \nI: Barrett's mucosa without dysplasia\nII: Barrett's mucosa indefinite for dysplasia",
+    "Conclusie": "Esophageal biopsies show gastric-type mucosa (I) and squamocolumnar junction (II, III) with mild chronic inflammation, intestinal metaplasia (I, III), and reactive epithelial changes. In specimen II, the findings are indefinite for dysplasia. In specimens I and III, there is no dysplasia. Specimen I also shows an increase in parietal cells.",
+    "Diagnose": "esophagus*biopsy*intestinal metaplasia*indefinite for dysplasia*inflammation*reactive",
+    "barrett_label": "IND"
+}"
+
+**OUTPUT:**
+
+"{
+    "An_Number": "RL-0001",
+    "KlinischeVraagstelling": "Indefinite for dysplasia?",
+    "KlinischeGegevens": "The patient has a history of Barrett's esophagus and is suspicious for being indefinite for dysplasia. The submitted material consists of esophageal biopsies for review.",
+    "report": "Biopsies show gastric-type mucosa with elongated, tortuous foveolae, a mild mixed inflammatory infiltrate in the lamina propria, and multiple goblet cells, consistent with intestinal metaplasia. No dysplasia is seen. No neutrophils transgressing the epithelium. There is a notable increase in parietal cells. Esophageal biopsies show gastric-type mucosa. In another section biopsies show a transition from non-keratinizing squamous epithelium to mucinous columnar epithelium, with mild chronic inflammation. Locally, the epithelium shows basal stratification of small nuclei with an open chromatin pattern, interpreted as reactive. No active inflammation. Some foveolae show nuclear atypia in the lining epithelium. Barrett's mucosa indefinite for dysplasia. Furthermore, in another section Biopsies show a squamocolumnar junction with mild chronic inflammation and focal intestinal metaplasia. No dysplasia.",
+    "Diagnose": "esophagus*biopsy*intestinal metaplasia*indefinite for dysplasia*inflammation*reactive"
+}"
+
+## **EXAMPLE 3**
+
+**INPUT:**
+
+"{
+    "An_Number": "RL-0152",
+    "KlinischeVraagstelling": "",
+    "KlinischeGegevens": "The material consists of esophageal biopsies from a small Barrett's segment, received for consultation.",
+    "Microscopie": "There are mucosal fragments that are partly lined with squamous and partly with intestinal metaplastic mucosa. A limited focus of partly tangentially sectioned glandular structures is seen with a somewhat disordered arrangement of the nuclear pattern, with depletion of mucin and some stacking at the surface. Differential diagnosis considers indefinite for dysplasia versus reactive epithelial changes. In deeper sections, the focus is no longer present.",
+    "Conclusie": "Esophageal biopsies show a squamocolumnar junction with intestinal metaplasia and no dysplasia.",
+    "Diagnose": "esophagus*biopsy*intestinal metaplasia*reactive",
+    "barrett_label": "ND"
+        }"
+
+**OUTPUT:**
+
+"{
+    "An_Number": "RL-0152",
+    "KlinischeVraagstelling": "",
+    "KlinischeGegevens": "The material consists of esophageal biopsies from a small Barrett's segment, received for consultation.",
+    "report": "There are mucosal fragments that are partly lined with squamous and partly with intestinal metaplastic mucosa. A limited focus of partly tangentially sectioned glandular structures is seen with a somewhat disordered arrangement of the nuclear pattern, with depletion of mucin and some stacking at the surface. Differential diagnosis considers indefinite for dysplasia versus reactive epithelial changes. In deeper sections, the focus is no longer present. Therefore, esophageal biopsies show a squamocolumnar junction with intestinal metaplasia and no dysplasia.",
+    "Diagnose": "esophagus*biopsy*intestinal metaplasia*reactive"
+}"
+
+
+## **EXAMPLE 4**
+
+**INPUT:**
+
+"{
+    "An_Number": "RL-0313",
+    "KlinischeVraagstelling": "Polyp or inflammation? Dysplasia or inflammation? Intestinal metaplasia? HP? Intestinal metaplasia? Dysplasia?",
+    "KlinischeGegevens": "The patient has a history of a short Barrett's segment and polyps in the stomach. The material consists of gastric and esophageal biopsies for follow-up and assessment of dysplasia or inflammation.",
+    "Microscopie": "I: small intestinal mucosa with preserved architecture composed of long, slender villi without intraepithelial lymphocytosis. A few villi are lined with cylindrical epithelium with nuclear enlargement, nuclear stratification, and loss of polarity. In the lamina propria, there is no increase in inflammatory cells. \nII: gastric mucosa biopsies with elongated, irregularly branching foveolae at the surface lined with non-atypical epithelium. No signs of inflammation. No intestinal metaplasia.\nIII: superficial mucosal fragment with influx of granulocytes. Biopsies are essentially too superficial for adequate diagnosis. \nIV and V: antrum- and corpus-type gastric mucosa with preserved architecture without influx of inflammatory cells. No intestinal metaplasia or dysplasia. In the lamina propria, possibly a slight increase in round-cell inflammatory cells with reactive changes. \nVI and VII: mucosal biopsies partly lined with stratified non-keratinizing squamous epithelium, but most of the biopsy is composed of glandular epithelium with scattered goblet cells and in multiple glandular structures, cells with enlarged nuclei, loss of polarity, and hyperchromasia. Here, an influx of a mixed-cell inflammatory infiltrate with multiple intraepithelial granulocytes. Best classified as indefinite for dysplasia",
+    "Conclusie": "I: duodenum biopsy: duodenal mucosa with reactive epithelial changes. No polypoid lesion. \nII and III: gastric biopsies, antrum: picture most consistent with a hyperplastic polyp. No dysplasia or malignancy.\nIV and V: gastric biopsies, antrum and corpus: corpus- and antrum-type gastric mucosa with minimal chronic inflammation, without active gastritis, intestinal metaplasia, atrophy, or dysplasia. No Helicobacter pylori. This is a non-specific picture. \nVI: squamocolumnar junction with chronic active inflammation, intestinal metaplasia, and mild atypia of the columnar epithelium, best classified as 'indefinite for dysplasia'.",
+    "Diagnose": "stomach*biopsy*hyperplastic polyp\nesophagus*biopsy*barrett's*indefinite for dysplasia",
+    "barrett_label": "IND"
+        }"
+
+**OUTPUT:**
+
+"{
+    "An_Number": "RL-0313",
+    "KlinischeVraagstelling": "Polyp or inflammation? Dysplasia or inflammation? Intestinal metaplasia? HP? Intestinal metaplasia? Dysplasia?",
+    "KlinischeGegevens": "The patient has a history of a short Barrett's segment and polyps in the stomach. The material consists of gastric and esophageal biopsies for follow-up and assessment of dysplasia or inflammation.",
+    "report": "small intestinal mucosa with preserved architecture composed of long, slender villi without intraepithelial lymphocytosis. A few villi are lined with cylindrical epithelium with nuclear enlargement, nuclear stratification, and loss of polarity. In the lamina propria, there is no increase in inflammatory cells. duodenum biopsy: duodenal mucosa with reactive epithelial changes. No polypoid lesion. In another section gastric mucosa biopsies with elongated, irregularly branching foveolae at the surface lined with non-atypical epithelium. No signs of inflammation. No intestinal metaplasia. Antrum: picture most consistent with a hyperplastic polyp. Furthermore, in another section we see superficial mucosal fragment with influx of granulocytes. Biopsies are essentially too superficial for adequate diagnosis. Also, antrum- and corpus-type gastric mucosa with preserved architecture without influx of inflammatory cells. No intestinal metaplasia or dysplasia. In the lamina propria, possibly a slight increase in round-cell inflammatory cells with reactive changes. In other sections, mucosal biopsies are partly lined with stratified non-keratinizing squamous epithelium, but most of the biopsy is composed of glandular epithelium with scattered goblet cells and in multiple glandular structures, cells with enlarged nuclei, loss of polarity, and hyperchromasia. Here, an influx of a mixed-cell inflammatory infiltrate with multiple intraepithelial granulocytes. Best classified as indefinite for dysplasia",
+    "Diagnose": "stomach*biopsy*hyperplastic polyp\nesophagus*biopsy*barrett's*indefinite for dysplasia"
+}"
+
+
+## **EXAMPLE 5**
+
+**INPUT:**
+
+"{
+    "An_Number": "RL-0316",
+    "KlinischeVraagstelling": "Persistent ulcer of the gastric cardia/fundus, cause uncertain",
+    "KlinischeGegevens": "The patient has a history of Crohn's disease and Helicobacter gastritis, with a persistent ulcer of the gastric cardia/fundus. The cause is uncertain and could be consistent with Crohn's disease, reactive, or malignant.",
+    "Microscopie": "",
+    "Conclusie": "Biopsy of gastric fundus lesion: gastric-type mucosa with extensive active partially ulcerating inflammation in the presence of Helicobacter pylori. There is a limited amount of intestinal metaplasia. Additionally, epithelial abnormalities are present and best classified as neoplastic.",
+    "Diagnose": "stomach*biopsy*intestinal metaplasia*inflammation*neoplasia",
+    "barrett_label": "NA"
+        }"
+
+**OUTPUT:**
+
+"{
+    "An_Number": "RL-0316",
+    "KlinischeVraagstelling": "Persistent ulcer of the gastric cardia/fundus, cause uncertain",
+    "KlinischeGegevens": "The patient has a history of Crohn's disease and Helicobacter gastritis, with a persistent ulcer of the gastric cardia/fundus. The cause is uncertain and could be consistent with Crohn's disease, reactive, or malignant.",
+    "report": "Biopsy shows gastric-type mucosa with extensive active partially ulcerating inflammation in the presence of Helicobacter pylori. There is a limited amount of intestinal metaplasia. Epithelial abnormalities best classified as neoplastic.",
+    "Diagnose": "stomach*biopsy*intestinal metaplasia*inflammation*low-grade dysplasia"
+}"
+
+
+## **EXAMPLE 6**
+
+**INPUT:**
+
+"{
+    "An_Number": "RL-0323",
+    "KlinischeVraagstelling": "Dysplasia?",
+    "KlinischeGegevens": "The patient has a known history of Barrett's esophagus and the clinical question is the presence of dysplasia.",
+    "Microscopie": "There are mucosal fragments that are partly lined with squamous epithelium and largely with columnar-type mucosa, where a part shows intestinal metaplasia. Submucosal reactive stromal and epithelial changes are noted. In one biopsy, there is an abnormal aspect of the epithelium with glandular structures that are regularly placed and variably shaped. The lining epithelium has enlarged and somewhat irregularly formed nuclei, with occasional increased polymorphism of the nuclear image. Insufficient indications for certain high-grade dysplasia.",
+    "Conclusie": "Esophageal biopsies show a squamocolumnar junction with intestinal metaplasia and reactive epithelial changes. There is an abnormal epithelial aspect with features concerning for dysplasia, but insufficient for a definitive diagnosis of high-grade dysplasia.",
+    "Diagnose": "esophagus*biopsy*intestinal metaplasia*low-grade dysplasia",
+    "barrett_label": "LGD"
+        }"
+
+**OUTPUT:**
+
+"{
+    "An_Number": "RL-0323",
+    "KlinischeVraagstelling": "Dysplasia?",
+    "KlinischeGegevens": "The patient has a known history of Barrett's esophagus and the clinical question is the presence of dysplasia.",
+    "report": "There are mucosal fragments that are partly lined with squamous epithelium and largely with columnar-type mucosa, where a part shows intestinal metaplasia. Submucosal reactive stromal and epithelial changes are noted. In one biopsy, there is an abnormal aspect of the epithelium with glandular structures that are regularly placed and variably shaped. The lining epithelium has enlarged and somewhat irregularly formed nuclei, with occasional increased polymorphism of the nuclear image. Insufficient indications for certain high-grade dysplasia. In conclusion, esophageal biopsies show a squamocolumnar junction with intestinal metaplasia and reactive epithelial changes. There is an abnormal epithelial aspect with features concerning for dysplasia, but insufficient for a definitive diagnosis of high-grade dysplasia.",
+    "Diagnose": "esophagus*biopsy*intestinal metaplasia*low-grade dysplasia"
+}"
+
+## **EXAMPLE 7**
+
+**INPUT:**
+
+"{
+    "An_Number": "RL-0536",
+    "KlinischeVraagstelling": "Barrett's esophagus, clinically unsuspected",
+    "KlinischeGegevens": "The patient has Barrett's esophagus and the clinical question is about the presence of dysplasia.",
+    "Microscopie": "I and II show columnar, gastric cardia-type mucosa with limited intestinal metaplasia. The epithelium of the foveolar layer shows a slightly abnormal aspect with elongation and stratification. The (pseudo) stratified epithelium sometimes also shows higher-lying division figures. Locally, there is mild active inflammation. IV shows gastric cardia-type mucosa with intestinal metaplasia, where a single loose-lying epithelium with stacked and elongated nuclear image is seen.",
+    "Conclusie": "Esophageal biopsies show columnar mucosa with intestinal metaplasia. I and II biopsies are classified as low-grade dysplasia due to the presence of elongation, stratification, and higher-lying division figures. IV biopsy is best classified as indefinite for dysplasia based on the loose-lying flake.",
+    "Diagnose": "esophagus*biopsy*intestinal metaplasia*low-grade dysplasia*indefinite for dysplasia",
+    "barrett_label": "LGD"
+        }"
+
+**OUTPUT:**
+
+"{
+    "An_Number": "RL-0536",
+    "KlinischeVraagstelling": "Barrett's esophagus, clinically unsuspected",
+    "KlinischeGegevens": "The patient has Barrett's esophagus and the clinical question is about the presence of dysplasia.",
+    "report": "Gastric cardia-type mucosa with limited intestinal metaplasia. The epithelium of the foveolar layer shows a slightly abnormal aspect with elongation and stratification. The (pseudo) stratified epithelium sometimes also shows higher-lying division figures. Locally, there is mild active inflammation. A section shows gastric cardia-type mucosa with intestinal metaplasia, where a single loose-lying epithelium with stacked and elongated nuclear image is seen. Esophageal biopsies show columnar mucosa with intestinal metaplasia. Some biopsies are classified as low-grade dysplasia due to the presence of elongation, stratification, and higher-lying division figures. There is also a section best classified as indefinite for dysplasia based on the loose-lying flake.",
+    "Diagnose": "esophagus*biopsy*intestinal metaplasia*low-grade dysplasia*indefinite for dysplasia",
+    "barrett_label": "LGD"
+}"
+
+## **Your Turn**
+
+**INPUT:**
+
+"__INPUT_TEXT__"
+
+**OUTPUT:**
+
+"
