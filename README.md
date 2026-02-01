@@ -4,6 +4,12 @@
 
 This repository contains the core model architecture (`src`), training and evaluation experiments (`experiments`), and data processing utilities (`scripts`).
 
+### 💡 Project Concept & Methodology
+
+The core objective of MLLM Barrett is to develop a multimodal model capable of generating comprehensive pathology reports directly from Whole Slide Image (WSI) embeddings. By training on patient-specific slide representations paired with their corresponding clinical text, the model moves beyond traditional discrete classification (e.g., NDBE vs. LGD vs. HGD vs. carcinoma) to learn rich, high-dimensional features from the reports themselves. This approach aims to identify textual nuances critical for precursor lesion identification that standard classifiers might overlook. 
+
+Technically, the project leverages state-of-the-art vision-language foundation models: [**CONCH**](https://github.com/mahmoodlab/CONCH) (pretrained on 1.17M image-caption pairs for robust histopathology representations) provides the patch-level encoding, while [**TITAN**](https://github.com/mahmoodlab/TITAN) (a whole-slide foundation model) enables slide-level feature alignment. Since the full TITAN decoder remains unpublished, we utilize its encoding model to obtain WSI embeddings and implement a custom transformer decoder to pool these features. These pooled embeddings are prepended to the text prompt, following a causal language modeling objective (next-token prediction) similar to the architecture used in [**Gemma-3**](https://developers.googleblog.com/gemma-explained-whats-new-in-gemma-3/), allowing the model to "read" the visual information as a prefix to its generative task.
+
 ## 📋 Table of Contents
 
 - [Installation](#installation)
@@ -75,12 +81,6 @@ All experiments are driven by YAML configuration files located in `experiments/c
 ---
 
 ## 📂 Data Structure & Miscellanea
-
-### 💡 Project Concept & Methodology
-
-The core objective of MLLM Barrett is to develop a multimodal model capable of generating comprehensive pathology reports directly from Whole Slide Image (WSI) embeddings. By training on patient-specific slide representations paired with their corresponding clinical text, the model moves beyond traditional discrete classification (e.g., NDBE vs. LGD vs. HGD vs. carcinoma) to learn rich, high-dimensional features from the reports themselves. This approach aims to identify textual nuances critical for precursor lesion identification that standard classifiers might overlook. 
-
-Technically, the project leverages state-of-the-art vision-language foundation models: [**CONCH**](https://github.com/mahmoodlab/CONCH) (pretrained on 1.17M image-caption pairs for robust histopathology representations) provides the patch-level encoding, while [**TITAN**](https://github.com/mahmoodlab/TITAN) (a whole-slide foundation model) enables slide-level feature alignment. Since the full TITAN decoder remains unpublished, we utilize its encoding model to obtain WSI embeddings and implement a custom transformer decoder to pool these features. These pooled embeddings are prepended to the text prompt, following a causal language modeling objective (next-token prediction) similar to the architecture used in [**Gemma-3**](https://developers.googleblog.com/gemma-explained-whats-new-in-gemma-3/), allowing the model to "read" the visual information as a prefix to its generative task.
 
 To provide further context on the environment where MLLM Barrett is developed and evaluated, this section details the directory hierarchy and data organization in Snellius under project space ```projects/0/prjs1597/```.
 
