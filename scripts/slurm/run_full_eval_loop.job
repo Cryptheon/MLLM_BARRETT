@@ -1,0 +1,83 @@
+#!/bin/bash
+#SBATCH --job-name=eval_loop_vllm
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=4
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --time=12:00:00
+#SBATCH --output=slurm_logs/eval_loop_%j.out
+#SBATCH --error=slurm_logs/eval_loop_%j.err
+
+# --- Config ---
+CONTAINER_PATH="/projects/2/managed_datasets/containers/vllm/cuda-13.0-vllm.sif"
+MODEL="Qwen/Qwen3-235B-A22B-GPTQ-Int4"
+PORT=$(shuf -i 10000-60000 -n 1)
+
+# Paths relative to MLLM_BARRETT root
+START_CHECKPOINT=400
+END_CHECKPOINT=1500
+STEP=50
+BASE_MODEL_PATH="./src/trained/mid_lr_pretrained_qwen_tcga_structured_revision"
+EVAL_CONFIG="./experiments/configs/eval_config.yaml"
+OUTPUT_BASE="./src/output/plots"
+GT_LABELS="./experiments/configs/labels/reference_full_real_report_labels.json"
+
+mkdir -p slurm_logs
+
+# 1. START vLLM SERVER
+echo "Starting vLLM Server on Port $PORT..."
+apptainer exec --nv -B "$PWD" "$CONTAINER_PATH" \
+  vllm serve "$MODEL" \
+  --port $PORT \
+  --tensor-parallel-size 4 \
+  --max-model-len 8192 \
+  --trust-remote-code \
+  --quantization gptq \
+  --gpu-memory-utilization 0.95 &
+
+SERVER_PID=$!
+
+# Wait for server
+echo "Waiting for server ready check..."
+while ! curl -s "http://localhost:$PORT/health" > /dev/null; do
+    if ! kill -0 $SERVER_PID 2>/dev/null; then
+        echo "Server died during startup."
+        exit 1
+    fi
+    sleep 10
+done
+echo "Server Ready!"
+
+# 2. RUN EVALUATION LOOP
+# Export PYTHONPATH so python sees 'src'
+export PYTHONPATH=$PYTHONPATH:$(pwd)
+
+for i in $(seq $START_CHECKPOINT $STEP $END_CHECKPOINT); do
+    MODEL_FILE="${BASE_MODEL_PATH}/checkpoint-${i}/model.safetensors"
+    
+    if [ -f "$MODEL_FILE" ]; then
+        echo "=========================================="
+        echo "Processing Checkpoint: $i"
+        echo "=========================================="
+        
+        # Run the python orchestrator inside the container
+        # NOTE: We run experiments/run_evaluations_vllm.py
+        apptainer exec --nv -B "$PWD" "$CONTAINER_PATH" \
+          python3 experiments/run_evaluations_vllm.py \
+          --config "$EVAL_CONFIG" \
+          --model "$MODEL_FILE" \
+          --output_base_dir "$OUTPUT_BASE" \
+          --source_report_labels "$GT_LABELS" \
+          --port "$PORT" \
+          --model_name_vllm "$MODEL" \
+          --prompt_schema "experiments/prompts/clinical_schema_extraction.txt" \
+          --prompt_judge "experiments/prompts/llm_judge.txt"
+          
+    else
+        echo "Skipping Checkpoint $i (File not found)"
+    fi
+done
+
+# 3. CLEANUP
+echo "Evaluation loop finished. Killing server."
+kill $SERVER_PID
