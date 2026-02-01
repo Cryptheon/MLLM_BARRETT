@@ -1,12 +1,18 @@
 import argparse
 import yaml
 import logging
-from utils.util_functions import print_model_size, freeze_model_layers
+import sys
+import os
+
+# Ensure src is in path if running from root
+sys.path.append(os.path.join(os.getcwd(), 'src'))
+
+from src.utils.util_functions import print_model_size, freeze_model_layers
 from transformers import AutoTokenizer, TrainingArguments
-from model.patho_llama import PathoLlamaForCausalLM, PathoLlamaConfig
-from data.datasets import MultiModalBarrett, MultiModalBarrettSingleSlide
-from trainer.multimodal_trainer import MultiModalTrainer
-from data.collator import MultiModalCollator
+from src.model.patho_llama import PathoLlamaForCausalLM, PathoLlamaConfig
+from src.data.datasets import MultiModalBarrett
+from src.trainer.multimodal_trainer import MultiModalTrainer
+from src.data.collator import MultiModalCollator
 
 
 # Set up logging
@@ -22,7 +28,8 @@ def load_config(path: str) -> dict:
 
 def main():
     parser = argparse.ArgumentParser(description="Train PathoLlama model with multimodal data")
-    parser.add_argument('--config', type=str, default="./configs/tcga/config.yaml", help='Path to the config YAML file')
+    # Updated default config path
+    parser.add_argument('--config', type=str, default="experiments/configs/barrett/train_config.yaml", help='Path to the config YAML file')
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -39,7 +46,7 @@ def main():
     model = PathoLlamaForCausalLM(model_config)
     
     # Apply freezing logic based on config
-    if "freeze_config" in config["model"]: # Check within model config
+    if "freeze_config" in config["model"]: 
         logger.info("Applying model freezing configuration...")
         freeze_model_layers(model, config["model"]["freeze_config"])
     else:

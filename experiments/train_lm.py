@@ -1,16 +1,22 @@
 import argparse
 import yaml
 import logging
-from utils.util_functions import print_model_size 
+import sys
+import os
+
+# Ensure src is in path if running from root
+sys.path.append(os.path.join(os.getcwd(), 'src'))
+
+from src.utils.util_functions import print_model_size 
 from transformers import (
     AutoTokenizer,
     TrainingArguments,
     Trainer,
-    DataCollatorForLanguageModeling # Use standard data collator for LM
+    DataCollatorForLanguageModeling 
 )
 
-from model.text_llama import TextLlamaForCausalLM, TextLlamaConfig 
-from data.datasets import PubMedTextDataset 
+from src.model.text_llama import TextLlamaForCausalLM, TextLlamaConfig 
+from src.data.datasets import PubMedTextDataset 
 
 logging.basicConfig(
     level=logging.INFO,
@@ -19,14 +25,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def load_config(path: str) -> dict:
-    """Loads configuration from a YAML file."""
     with open(path, 'r') as file:
         return yaml.safe_load(file)
 
 def main():
     parser = argparse.ArgumentParser(description="Pretrain TextLlama model on text data")
-    # Update default config path if needed
-    parser.add_argument('--config', type=str, default="./configs/pubmed/config_pretrain.yaml", 
+    # Updated default config path
+    parser.add_argument('--config', type=str, default="experiments/configs/pubmed/config.yaml", 
                         help='Path to the text pretraining config YAML file')
     args = parser.parse_args()
 
@@ -48,7 +53,6 @@ def main():
     logger.info("Tokenizer '%s' loaded.", tokenizer_name)
 
     model_params = config["model"]
-    # Decide whether to load from pretrained or initialize from config
     pretrained_path = model_params.pop("pretrained_model_name_or_path", None) 
     
     if pretrained_path:
@@ -57,7 +61,6 @@ def main():
         model = TextLlamaForCausalLM.from_pretrained(pretrained_path, config=model_config)
     else:
         logger.info("Initializing model from scratch using config.")
-        # Ensure necessary Llama config params are present in model_params
         model_config = TextLlamaConfig(**model_params) 
         model = TextLlamaForCausalLM(model_config)
 
@@ -68,7 +71,6 @@ def main():
 
     dataset_config = config["dataset"]
     train_json_path = dataset_config["train_json_path"]
-  
     max_seq_length = dataset_config["max_seq_length"]
 
     if not max_seq_length:
@@ -79,44 +81,32 @@ def main():
         json_path=train_json_path,
         tokenizer=tokenizer,
         max_seq_length=max_seq_length,
-        shuffle_on_init=True, # Shuffle training data when loaded
+        shuffle_on_init=True, 
         custom_tokenizer=config["tokenizer"]["custom_tokenizer"]
-        # num_data_points can be added here if specified in config
     )
     logger.info("Training dataset loaded from %s (%d samples)", train_json_path, len(train_dataset))
 
-    # For Causal LM pretraining (predicting the next token), mlm=False.
     collator = DataCollatorForLanguageModeling(
         tokenizer=tokenizer, 
         mlm=False
     )
-    logger.info("Data collator for Causal LM initialized (mlm=False).")
-
+    
     training_params = config["training"]
-    if not training_params["output_dir"]:
-         raise ValueError("output_dir must be specified in training config.")
-         
     training_args = TrainingArguments(**training_params)
     logger.info("Training arguments set.")
-    # Log effective batch size
-    effective_batch_size = (training_args.per_device_train_batch_size * training_args.gradient_accumulation_steps *
-                            training_args.world_size) # world_size is 1 if not distributed
-    logger.info(f"Effective batch size: {effective_batch_size}")
 
     trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset,
         data_collator=collator,
-        tokenizer=tokenizer # Pass tokenizer for saving purposes
+        tokenizer=tokenizer 
     )
     logger.info("Standard Trainer initialized. Starting pretraining...")
 
-    # Check for resuming from checkpoint
-    resume_from_checkpoint = training_args.resume_from_checkpoint
-    if resume_from_checkpoint:
-         logger.info(f"Resuming training from checkpoint: {resume_from_checkpoint}")
-         trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+    if training_args.resume_from_checkpoint:
+         logger.info(f"Resuming training from checkpoint: {training_args.resume_from_checkpoint}")
+         trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
     else:
          trainer.train()
          

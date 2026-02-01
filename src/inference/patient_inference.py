@@ -3,10 +3,16 @@ import yaml
 import logging
 import random
 import torch
+import sys
+import os
+
+# Ensure src is reachable if run from anywhere
+sys.path.append(os.path.join(os.getcwd(), 'src'))
+
 from transformers import AutoTokenizer
-from model.patho_llama import PathoLlamaForCausalLM, PathoLlamaConfig 
-from data.datasets import MultiModalBarrett
-from utils.util_functions import print_model_size
+from src.model.patho_llama import PathoLlamaForCausalLM, PathoLlamaConfig 
+from src.data.datasets import MultiModalBarrett
+from src.utils.util_functions import print_model_size
 from safetensors.torch import load_file
 from rich.console import Console
 from rich.panel import Panel
@@ -34,11 +40,18 @@ def load_model_tokenizer(config):
     model_config = PathoLlamaConfig(**config["model"])
     model = PathoLlamaForCausalLM(model_config)
     model.training = False
-    state_dict = load_file(config["inference"]["model_path"])
+    
+    # Check if model path exists
+    model_path = config["inference"]["model_path"]
+    if not os.path.exists(model_path):
+        logger.error(f"Model path does not exist: {model_path}")
+        raise FileNotFoundError(f"Model path does not exist: {model_path}")
+
+    state_dict = load_file(model_path)
     model.load_state_dict(state_dict)
     model.eval()
     model.to("cuda" if torch.cuda.is_available() else "cpu")
-    logger.info("Model loaded from %s", config["inference"]["model_path"])
+    logger.info("Model loaded from %s", model_path)
 
     trainable_params, total_params, total_mb = print_model_size(model)
     logger.info("Trainable parameters: %s", f"{trainable_params:,}")
@@ -48,15 +61,14 @@ def load_model_tokenizer(config):
 
 def load_data(config, tokenizer):
     # Load dataset using MultiModalBarrett
+    # Note: random_choice_report argument removed as it's not in the __init__ of MultiModalBarrett
     dataset =  MultiModalBarrett(json_file=config["dataset"]["train_texts_json_path"], # Using val path for inference
                                       embeddings_file=config["dataset"]["train_h5_file_path"], # Using val path for inference
                                       tokenizer=tokenizer,
                                       phase="val",
                                       val_data_ratio=config["dataset"]["val_data_ratio"],
-                                      max_seq_length=config["dataset"]["max_seq_length"],
-                                      random_choice_report=config["dataset"]["random_choice_report"])
+                                      max_seq_length=config["dataset"]["max_seq_length"])
     
-    # Corrected log message
     logger.info("Validation dataset loaded from JSON and HDF5 files.")
 
     return dataset
@@ -92,29 +104,35 @@ def get_data(config, tokenizer, dataset, args):
     # We access the raw sample from the .samples list to get the text data.
     raw_sample = dataset.samples[idx]
     case_data = raw_sample["case_data"]
-    print(case_data)
-    translated_reports = case_data.get("cleaned_reports", [])
+    # print(case_data) # Debug print removed
     
-    # Use the same logic as __getitem__ to select a report
-    if config["dataset"]["random_choice_report"] and len(translated_reports) > 1:
-        report = random.choice(translated_reports)
+    # Handle report structure (TCGA structured or legacy cleaned_reports)
+    if "tcga_structured" in case_data:
+        report_data = case_data["tcga_structured"]
+        # Assuming we just want the 'report' field for TCGA structured
+        report_text = report_data.get("report", "")
+        original_text = f"report: {report_text}"
     else:
-        report = translated_reports[0]
-    
-    text_parts = [report.get(k, "") for k in ["Microscopie", "Conclusie", "Diagnose"]]
-    original_text = "\n".join(filter(None, text_parts))
+        # Fallback to old structure if needed
+        translated_reports = case_data.get("cleaned_reports", [])
+        if isinstance(translated_reports, list) and translated_reports:
+             if config["dataset"].get("random_choice_report", False) and len(translated_reports) > 1:
+                 report = random.choice(translated_reports)
+             else:
+                 report = translated_reports[0]
+             text_parts = [report.get(k, "") for k in ["Microscopie", "Conclusie", "Diagnose"]]
+             original_text = "\n".join(filter(None, text_parts))
+        else:
+            original_text = "No text report available."
 
     # Add the batch dimension required for model inference
     wsi_embeddings = wsi_embeddings.unsqueeze(0)
-    print("embeddings shape", wsi_embeddings.shape)
+    # print("embeddings shape", wsi_embeddings.shape) # Debug print removed
 
     return wsi_embeddings, original_text, patient_id
 
 
 def generate(model, tokenizer, wsi_embeddings, config):
-    # Your original script passed `original_text` here but named it `input_ids`
-    # and then immediately overwrote it. This version is cleaner.
-    
     # We start generation from an empty prompt, as the context comes from WSI embeddings
     input_tokens = tokenizer("", return_tensors="pt")
     input_ids = input_tokens["input_ids"].to(model.device)
@@ -137,7 +155,7 @@ def generate(model, tokenizer, wsi_embeddings, config):
             max_new_tokens=config["inference"]["max_new_tokens"],
             do_sample=config["inference"]["do_sample"],
             temperature=config["inference"]["temperature"],
-            stop_strings="<|end_of_text|>",
+            stop_strings=["<|end_of_text|>", "END OF REPORT"],
             eos_token_id=tokenizer.eos_token_id,
             tokenizer=tokenizer
         )
@@ -146,7 +164,8 @@ def generate(model, tokenizer, wsi_embeddings, config):
 
 def main():
     parser = argparse.ArgumentParser(description="Run inference on PathoLlama model with multimodal data")
-    parser.add_argument('--config', type=str, default="./configs/barrett/config.yaml", help='Path to config YAML file')
+    # Updated default config path
+    parser.add_argument('--config', type=str, default="experiments/configs/model_inference/barrett/config.yaml", help='Path to config YAML file')
     parser.add_argument('--patient', type=str, default=None, help='Patient ID to use (optional, will sample if not provided)')
     args = parser.parse_args()
 

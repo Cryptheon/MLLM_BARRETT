@@ -4,6 +4,9 @@ import re
 import sys
 from pathlib import Path
 
+# Define project root relative to this file: src/utils/vllm_utils.py -> root is 2 levels up
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+
 def get_nested_value(data, path):
     """Retrieves value from nested dict (e.g., 'case.report')."""
     keys = path.split('.')
@@ -38,12 +41,18 @@ def prepare_prompts(args):
     # Robust path handling for prompts
     prompt_path = Path(args.prompt_file)
     if not prompt_path.exists():
-         # Fallback: check inside experiments/prompts/
-         fallback = Path("experiments/prompts") / args.prompt_file
+         # Fallback: check inside experiments/prompts/ relative to root
+         fallback = ROOT_DIR / "experiments/prompts" / args.prompt_file
          if fallback.exists():
              prompt_path = fallback
          else:
-             raise FileNotFoundError(f"Prompt file not found: {args.prompt_file}")
+             # Just in case the user provided a full relative path that didn't match cwd
+             # try relative to root directly
+             fallback_root = ROOT_DIR / args.prompt_file
+             if fallback_root.exists():
+                 prompt_path = fallback_root
+             else:
+                 raise FileNotFoundError(f"Prompt file not found: {args.prompt_file}")
 
     with open(prompt_path, 'r', encoding='utf-8') as f:
         base_prompt = f.read()
@@ -119,30 +128,4 @@ def merge_results(args):
             set_nested_value(item, args.output_key, final_val)
             count += 1
 
-    with open(args.input_json, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
-    print(f"Merged {count} results into {args.input_json}")
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers(dest='action')
-
-    # Subparser for Preparing
-    p_prep = subparsers.add_parser('prepare')
-    p_prep.add_argument('--input_json', required=True)
-    p_prep.add_argument('--output_jsonl', required=True)
-    p_prep.add_argument('--prompt_file', required=True)
-    p_prep.add_argument('--input_keys', nargs='+', required=True)
-
-    # Subparser for Merging
-    p_merge = subparsers.add_parser('merge')
-    p_merge.add_argument('--input_json', required=True)
-    p_merge.add_argument('--vllm_output_jsonl', required=True)
-    p_merge.add_argument('--output_key', required=True)
-    p_merge.add_argument('--parse_think', action='store_true')
-
-    args = parser.parse_args()
-    if args.action == 'prepare':
-        prepare_prompts(args)
-    elif args.action == 'merge':
-        merge_results(args)
+    with open(args

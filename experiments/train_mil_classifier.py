@@ -23,7 +23,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------
-# 1. Hybrid Dataset Class
+# 1. Hybrid Dataset Class (Kept in-script as it's experiment-specific)
 # -----------------------------------------------------------------------------
 class BarrettEmbeddingDataset(Dataset):
     def __init__(self, json_file: str, embeddings_file: str, phase: str = "train", 
@@ -89,17 +89,9 @@ class BarrettEmbeddingDataset(Dataset):
                         continue
                     
                     # FIND MATCHING KEY logic:
-                    # We need to find the H5 key that corresponds to 'RL-0012' AND part 'I'.
-                    # Typical H5 keys: 'RL-0012_I', 'RL-0012_I_features', 'RL-0012-I'
-                    # We look for An_Number AND part_id in the key string.
-                    # To be safe, we ensure part_id is surrounded by non-alphanumeric or start/end
-                    
-                    # Heuristic: Key must start with An_Number and contain the Part ID
                     matching_key = None
                     for key in embedding_keys:
                         if key.startswith(an_number):
-                            # Simple check: is "_I" or "-I" or " I" in the key?
-                            # Using regex to ensure "I" doesn't match "II"
                             # Pattern: delimiter + part_id + delimiter/end
                             if re.search(f"[^a-zA-Z0-9]{part_id}[^a-zA-Z0-9]", key + "_"):
                                 matching_key = key
@@ -172,10 +164,6 @@ class BarrettEmbeddingDataset(Dataset):
 # -----------------------------------------------------------------------------
 
 class SimpleMLP(nn.Module):
-    """
-    Standard classifier for single instance learning.
-    Expects input: (Batch, Input_Dim) (averaged WSI embedding)
-    """
     def __init__(self, input_dim=768, hidden_dim=512, num_classes=3, dropout=0.25):
         super().__init__()
         self.net = nn.Sequential(
@@ -190,15 +178,10 @@ class SimpleMLP(nn.Module):
         )
 
     def forward(self, x):
-        # x: (Batch, 768)
         logits = self.net(x)
-        return logits, None # No attention weights
+        return logits, None 
 
 class GatedAttentionMIL(nn.Module):
-    """
-    MIL Model for bag of features.
-    Expects input: (Batch=1, Num_Patches, Input_Dim)
-    """
     def __init__(self, input_dim=768, hidden_dim=512, num_classes=3, dropout=0.25, gated=True):
         super().__init__()
         self.L = hidden_dim
@@ -268,7 +251,6 @@ def compute_class_weights(dataset: Dataset) -> torch.Tensor:
 
 def get_dataloaders(cfg: Dict) -> Tuple[DataLoader, DataLoader, torch.Tensor]:
     use_mil = not cfg['model']['use_single_instance_learning']
-    # If MIL, batch size must be 1. If MLP, we can batch.
     batch_size = 1 if use_mil else cfg['training']['batch_size']
     
     train_ds = BarrettEmbeddingDataset(
@@ -364,101 +346,4 @@ def save_plots(history: Dict, output_dir: str):
     plt.grid(True)
     
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, "training_metrics.png"))
-    plt.close()
-
-# -----------------------------------------------------------------------------
-# 4. Main
-# -----------------------------------------------------------------------------
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="mil_config.yaml")
-    args = parser.parse_args()
-
-    with open(args.config, 'r') as f:
-        cfg = yaml.safe_load(f)
-
-    set_seed(cfg['experiment']['seed'])
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    output_dir = cfg['training']['output_dir']
-    os.makedirs(output_dir, exist_ok=True)
-    
-    logger.info(f"Using device: {device}")
-
-    # 1. Data
-    train_loader, val_loader, class_weights = get_dataloaders(cfg)
-    class_weights = class_weights.to(device)
-    logger.info(f"Class Weights: {class_weights}")
-
-    # 2. Model Selection
-    if cfg['model']['use_single_instance_learning']:
-        logger.info("Initializing SimpleMLP (Single Instance Mode)")
-        # 
-        model = SimpleMLP(
-            input_dim=cfg['model']['input_dim'],
-            hidden_dim=cfg['model']['hidden_dim'],
-            num_classes=len(cfg['data']['classes_to_use']),
-            dropout=cfg['model']['dropout']
-        ).to(device)
-    else:
-        logger.info("Initializing GatedAttentionMIL (Bag Mode)")
-        # 
-        model = GatedAttentionMIL(
-            input_dim=cfg['model']['input_dim'],
-            hidden_dim=cfg['model']['hidden_dim'],
-            num_classes=len(cfg['data']['classes_to_use']),
-            dropout=cfg['model']['dropout'],
-            gated=cfg['model']['gated']
-        ).to(device)
-
-    # 3. Optimize
-    optimizer = AdamW(model.parameters(), 
-                      lr=float(cfg['training']['learning_rate']), 
-                      weight_decay=float(cfg['training']['weight_decay']))
-    criterion = nn.CrossEntropyLoss(weight=class_weights)
-    scheduler = CosineAnnealingLR(optimizer, T_max=cfg['training']['epochs'])
-
-    # 4. Loop
-    history = {'train_loss': [], 'val_loss': [], 'val_f1': []}
-    best_f1 = 0.0
-    val_metrics = {}
-
-    for epoch in range(cfg['training']['epochs']):
-        train_loss = train_epoch(model, train_loader, optimizer, criterion, device, cfg['training']['grad_accumulation_steps'])
-        val_metrics = validate(model, val_loader, criterion, device, cfg['data']['classes_to_use'])
-        scheduler.step()
-
-        history['train_loss'].append(train_loss)
-        history['val_loss'].append(val_metrics['loss'])
-        history['val_f1'].append(val_metrics['f1_macro'])
-
-        logger.info(f"Epoch [{epoch+1}/{cfg['training']['epochs']}] "
-                    f"Loss: {train_loss:.4f}/{val_metrics['loss']:.4f} | "
-                    f"F1: {val_metrics['f1_macro']:.4f}")
-
-        if val_metrics['f1_macro'] > best_f1:
-            best_f1 = val_metrics['f1_macro']
-            torch.save(model.state_dict(), os.path.join(output_dir, "best_model.pth"))
-            logger.info(f"--> New Best F1: {best_f1:.4f}")
-
-    # 5. Save & Report
-    if cfg['training']['save_plot']:
-        save_plots(history, output_dir)
-    
-    final_model_path = os.path.join(output_dir, "final_model.pth")
-    torch.save(model.state_dict(), final_model_path)
-    
-    results = {
-        "config": cfg,
-        "best_f1": best_f1,
-        "final_metrics": val_metrics['report_dict'],
-        "history": history
-    }
-    with open(os.path.join(output_dir, "results.json"), 'w') as f:
-        json.dump(results, f, indent=4)
-
-    logger.info("Training Finished.")
-    print(val_metrics['report_str'])
-
-if __name__ == "__main__":
-    main()
+    plt.savefig(os.path.join(output_dir, "training
