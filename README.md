@@ -74,6 +74,77 @@ All experiments are driven by YAML configuration files located in `experiments/c
 
 ---
 
+## 📂 Data Structure & Miscellanea
+
+To provide further context on the environment where MLLM Barrett is developed and evaluated, this section details the directory hierarchy and data organization in Snellius under project space ```projects/0/prjs1597/```.
+
+### 1. High-Level Hierarchy
+
+The project resides within a broader `LMM` workspace containing the model code, virtual environments, and data storage:
+
+```
+LMM/
+├── data/              # Central data repository (Raw, Processed, Results)
+├── MLLM_BARRETT/      # Core repository (this codebase)
+├── models/            # Base model weights (e.g., Llama-3, Qwen)
+├── trident/           # TRIDENT WSI processing tool
+├── trident_venv/      # Environment for WSI processing
+└── venv/              # Main environment for MLLM training
+```
+
+### 2. Data Organization (`data/`)
+
+The `data/` directory is split into three main categories:
+
+* **`data/raw/`**: Contains original Barrett's H&E slides, including the `HE_revision_24_10_25` set with 1,117+ cases. It also contains `xml/lms_updated.xml` for ground truth and the **Quilt** dataset.
+
+  * *Note on Quilt:* Quilt is a large-scale histopathology dataset provided by Google. While present in the raw directory (e.g., `quilt_instruct.zip`), it currently remains **unused** in this specific Barrett's pipeline.
+
+* **`data/processed/`**:
+
+  * `json/cleaned/`: Holds structured datasets such as `qwen_235b_tcga_structured_barrett.json`.
+
+  * `titan_combined_slide_features/`: Combined H5 files containing features extracted via CONCH and TITAN.
+
+  * `trident_conch_embeddings/`: Intermediate patch and slide features.
+
+* **`data/results/`**: Stores generated plots and the `trained/` directory, which houses various experiment checkpoints (e.g., `frozen`, `non_frozen`, `pretrained`, and `1_layer` variants).
+
+### 3. Structured Data Schema
+
+The primary dataset used for training and evaluation is `qwen_235b_tcga_structured_barrett.json`. Each entry contains the original Dutch pathology report, an English translation, a cleaned version for the LLM, and a TCGA-structured summary.
+
+**Example Entry:**
+
+```
+{
+    "original_case": {
+        "An_Number": "RL-0012",
+        "Microscopie": "I: doorsneden door ca. een 7-tal fragmenten...",
+        "Conclusie": "I + II: oesophagusbiopten in het kader van Barrett surveillance..."
+    },
+    "translated_reports": [...],
+    "cleaned_reports": {
+        "An_Number": "RL-0012",
+        "report": "Sections of the gastroesophageal junction show stratified...",
+        "barrett_label": "LGD"
+    },
+    "tcga_structured": {
+        "An_Number": "RL-0012",
+        "report": "Sections of the gastroesophageal junction show...",
+        "Diagnose": "esophagus*biopsy*intestinal metaplasia*barrett's*low-grade dysplasia*reactive"
+    }
+}
+```
+
+### 4. Evaluation & Plotting Scripts
+
+Located in `data/results/scripts/`, these utilities assist in analyzing model performance across training checkpoints:
+
+* **`plot_llm_judge.py`**: This script aggregates results from the "LLM-as-a-Judge" pipeline. It searches for timestamped evaluation directories within each checkpoint, parses `llm_judge_results.json`, and calculates mean scores for clinical acceptability (pass rates) and overall equivalence. It outputs distribution plots showing model improvement over time.
+
+* **`plot_gwk.py`**: This script focuses on schema extraction accuracy. It parses `schema_evaluation_results.json` to extract the **Quadratic Weighted Kappa (QWK)** for critical findings, allowing for a quantitative assessment of how well the model's structured output matches the expert ground truth.
+
 ## Data Processing & Experiment Pipeline
 
 ### 1. WSI Preprocessing (TRIDENT)
