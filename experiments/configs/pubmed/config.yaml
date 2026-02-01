@@ -1,0 +1,42 @@
+model:
+  core_model_name: "meta-llama/Meta-Llama-3-8B"
+  vocab_size: 32768
+  hidden_size: 768
+  num_hidden_layers: 2
+  num_attention_heads: 2
+  max_position_embeddings: 4096
+  
+tokenizer:
+  tokenizer_name: "./tokenizers/trained_tokenizers/32768_pubmed/"
+  vocab_size: 32768
+  custom_tokenizer: true
+
+dataset:
+  train_json_path: "./data/pubmed_abstracts_data/pubmed_histopathology_abstracts_303k.json"
+  embeddings_dim_size: 768
+  max_seq_length: 4096
+  random_choice_report: true
+
+training:
+  output_dir: "./llama_lm_train"
+  do_train: true
+  do_eval: false
+  save_strategy: "steps"
+  save_steps: 5000
+  logging_steps: 50
+  lr_scheduler_type: "linear"
+  logging_strategy: "steps"
+  #logging_dir: "./runs"
+  per_device_train_batch_size: 32
+  per_device_eval_batch_size: 1
+  num_train_epochs: 5
+  learning_rate: 0.0008
+  dataloader_num_workers: 12
+  fp16: false
+  bf16: true
+  remove_unused_columns: false
+  disable_tqdm: false
+  torch_compile: false
+  report_to: ["tensorboard"]
+
+
