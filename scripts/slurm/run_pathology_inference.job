@@ -1,0 +1,77 @@
+#!/bin/bash
+#SBATCH --job-name=qwen_pathology
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=4
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --time=04:00:00
+#SBATCH --output=slurm_logs/pathology_vllm_%j.log
+#SBATCH --error=slurm_logs/pathology_vllm_%j.err
+
+# --- Configuration ---
+export PORT=$(shuf -i 10000-60000 -n 1)
+export CONTAINER_PATH="/projects/2/managed_datasets/containers/vllm/cuda-13.0-vllm.sif"
+
+# The specific model you requested
+MODEL="Qwen/Qwen3-235B-A22B-GPTQ-Int4" 
+
+# Paths
+INPUT_FILE="data/intermediate/ready_for_inference.jsonl"
+OUTPUT_FILE="data/outputs/results_${SLURM_JOB_ID}.jsonl"
+
+# Inference Settings
+MAX_LEN=8192  # Context window (input + output)
+TP_SIZE=4     # Tensor Parallelism (Must match #SBATCH --gpus)
+
+# Create output directory
+mkdir -p data/outputs slurm_logs
+
+echo "Starting Job $SLURM_JOB_ID on node $SLURMD_NODENAME"
+echo "Model: $MODEL"
+echo "Port: $PORT"
+
+# --- Start vLLM Server ---
+# Note: For 235B models, we need Tensor Parallelism (TP) distributed across GPUs.
+# --trust-remote-code is often needed for Qwen/MoE models.
+# --gpu-memory-utilization 0.95 to maximize VRAM usage for the huge weights.
+
+apptainer exec --nv -B "$PWD" "$CONTAINER_PATH" \
+  vllm serve "$MODEL" \
+  --port $PORT \
+  --tensor-parallel-size $TP_SIZE \
+  --max-model-len $MAX_LEN \
+  --gpu-memory-utilization 0.95 \
+  --trust-remote-code \
+  --dtype float16 \
+  --quantization gptq &
+
+# Store PID
+SERVER_PID=$!
+
+# --- Wait for Server Readiness ---
+echo "Waiting for vLLM server..."
+while ! curl -s "http://localhost:$PORT/health" > /dev/null; do
+    if ! kill -0 $SERVER_PID 2>/dev/null; then
+        echo "Error: vLLM server died."
+        cat slurm_logs/pathology_vllm_${SLURM_JOB_ID}.err
+        exit 1
+    fi
+    sleep 5
+done
+echo "vLLM Server is ready!"
+
+# --- Run Python Client ---
+apptainer exec --nv -B "$PWD" "$CONTAINER_PATH" \
+  python3 scripts/batch_inference_decoder.py \
+  --input "$INPUT_FILE" \
+  --output "$OUTPUT_FILE" \
+  --model_name "$MODEL" \
+  --port $PORT \
+  --temperature 0.1 \
+  --concurrency 128 \
+  --max_tokens 2048
+
+echo "Inference complete. Results saved to $OUTPUT_FILE"
+
+# --- Cleanup ---
+kill $SERVER_PID
